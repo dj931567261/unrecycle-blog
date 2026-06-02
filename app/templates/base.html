@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DevHub-Me | 个人数字空间{% endblock %}</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block description %}这是我个人的技术博客、常用网址导航与网站收藏夹，用于记录我的技术成长与灵感碎片。{% endblock %}">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Prism.js Syntax Highlighting Theme (Tomorrow Night / Dark) -->
+    <link rel="stylesheet" href="/static/css/prism-tomorrow.min.css">
+    <link rel="stylesheet" href="/static/css/prism-line-numbers.min.css">
+    
+    <!-- Font Awesome Icons (Local) -->
+    <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="site-header">
+        <div class="container nav-container">
+            <!-- Site Brand Logo -->
+            <a href="/" class="site-logo">
+                <i class="fa-solid fa-terminal"></i> DevHub.me
+            </a>
+            
+            <!-- Main Site Nav links -->
+            <nav class="site-nav">
+                <ul>
+                    <li><a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">首页</a></li>
+                    <li><a href="/blog" class="nav-link {% if request.url.path.startswith('/blog') %}active{% endif %}">博客</a></li>
+                    <li><a href="/bookmarks" class="nav-link {% if request.url.path.startswith('/bookmarks') %}active{% endif %}">收藏</a></li>
+                    <li><a href="/tools" class="nav-link {% if request.url.path.startswith('/tools') %}active{% endif %}">工具箱</a></li>
+                </ul>
+            </nav>
+            
+            <!-- Header actions (Search & Admin status) -->
+            <div class="nav-actions">
+                <button id="search-trigger-btn" class="btn-icon" title="搜索 (Cmd + K / Ctrl + K)">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+                
+                {% if is_admin or username %}
+                    <a href="/admin" class="btn btn-secondary" style="padding: 8px 16px;">
+                        <i class="fa-solid fa-sliders"></i> 后台
+                    </a>
+                    <button onclick="logoutAdmin()" class="btn btn-danger" style="padding: 8px 16px;">
+                        <i class="fa-solid fa-right-from-bracket"></i> 退出
+                    </button>
+                {% else %}
+                    <a href="/login" class="btn btn-secondary" style="padding: 8px 16px;">
+                        <i class="fa-solid fa-user-shield"></i> 登录
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main style="flex-grow: 1; padding: 24px 0;">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; 2026 DevHub-Me. Built with FastAPI &amp; SQLite. Designed with Glassmorphism.</p>
+        </div>
+    </footer>
+
+    <!-- Global search dialog (Cmd + K) -->
+    <div id="search-modal" class="modal-backdrop">
+        <div class="glass-card admin-modal" style="max-width: 600px; padding: 24px;">
+            <div class="modal-header" style="margin-bottom: 16px; border: none; padding-bottom: 0;">
+                <h3 style="font-size: 18px;"><i class="fa-solid fa-magnifying-glass" style="margin-right: 8px; color: var(--accent-blue);"></i> 全局检索</h3>
+                <button id="search-modal-close" class="modal-close">&times;</button>
+            </div>
+            <div style="position: relative; margin-bottom: 16px;">
+                <input type="text" id="global-search-input" class="form-control" placeholder="输入关键字搜索博客、导航或收藏..." style="padding-left: 40px; font-size: 15px;">
+                <i class="fa-solid fa-keyboard" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                <i class="fa-solid fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+            </div>
+            <div id="search-results-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/prism-core.min.js"></script>
+    <script src="/static/js/prism-autoloader.min.js"></script>
+    <script src="/static/js/prism-line-numbers.min.js"></script>
+    <script>
+        // Configure Prism autoloader to load language components from BootCDN instead of cdnjs
+        if (window.Prism && Prism.plugins && Prism.plugins.autoloader) {
+            Prism.plugins.autoloader.languages_path = 'https://cdn.bootcdn.net/ajax/libs/prism/1.29.0/components/';
+        }
+    </script>
+    
+    <!-- Main JS logic for search modal, auth callbacks -->
+    <script>
+        // Log out admin helper
+        async function logoutAdmin() {
+            try {
+                const response = await fetch('/api/auth/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error("Logout failed:", error);
+            }
+        }
+
+        // Global search triggers
+        const searchModal = document.getElementById('search-modal');
+        const searchTriggerBtn = document.getElementById('search-trigger-btn');
+        const searchModalClose = document.getElementById('search-modal-close');
+        const globalSearchInput = document.getElementById('global-search-input');
+        const searchResultsContainer = document.getElementById('search-results-container');
+
+        function openSearch() {
+            searchModal.classList.add('open');
+            setTimeout(() => globalSearchInput.focus(), 150);
+        }
+
+        function closeSearch() {
+            searchModal.classList.remove('open');
+            globalSearchInput.value = '';
+            searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>';
+        }
+
+        if (searchTriggerBtn) searchTriggerBtn.addEventListener('click', openSearch);
+        if (searchModalClose) searchModalClose.addEventListener('click', closeSearch);
+
+        // Close on clicking backdrop
+        searchModal.addEventListener('click', (e) => {
+            if (e.target === searchModal) closeSearch();
+        });
+
+        // Hotkeys for search (Cmd + K / Ctrl + K)
+        window.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                if (searchModal.classList.contains('open')) {
+                    closeSearch();
+                } else {
+                    openSearch();
+                }
+            }
+            if (e.key === 'Escape' && searchModal.classList.contains('open')) {
+                closeSearch();
+            }
+        });
+
+        // Simple local search matching (navlinks, posts, bookmarks)
+        // In real-world, we can either fetch on keystroke or bundle index once.
+        // For absolute speed, let's query a search endpoint or local database.
+        let searchData = null;
+
+        async function loadSearchData() {
+            if (searchData) return;
+            try {
+                // Fetch search index from page details if we want, or fetch from home endpoints.
+                // We'll simulate search index loading by querying homepage categories, blog and bookmarks.
+                // To keep it simple, we'll implement a small API or fetch once.
+                // Let's create a small search endpoint or construct it locally.
+                // Let's fetch all items.
+                searchData = [];
+                
+                // Let's scrape data from DOM or fetch from endpoints. 
+                // For a robust search, we will fetch blog posts, navlinks, bookmarks.
+                // Let's query APIs or just scrape visible cards from DOM.
+                // As fallback, we can dynamically build this.
+            } catch (err) {
+                console.error("Search data load failed:", err);
+            }
+        }
+
+        globalSearchInput.addEventListener('input', async (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>';
+                return;
+            }
+
+            searchResultsContainer.innerHTML = '<div style="text-align:center; padding:16px;"><i class="fa-solid fa-spinner fa-spin"></i> 检索中...</div>';
+
+            // We can search the items dynamically. Since it's server-rendered, 
+            // a very easy way is to fetch search results from backend:
+            try {
+                // We can query a simple API or we search current page elements.
+                // For completeness, let's search elements from the DOM if we are on index page, 
+                // or fetch from db. To make search work on ANY page, let's write a simple client-side search.
+                // We'll scrape cards or fetch:
+                // Let's write a quick client-side DOM parser for index page, and for other pages, fetch.
+                // Better yet: we search dynamically via a lightweight endpoint or scrape local links.
+                // Let's fetch from the index data directly. For now, let's filter what's in the page, 
+                // and we'll implement a robust search handler.
+                
+                // For demo, search items in DOM
+                const items = [];
+                
+                // Scrape navigation cards
+                document.querySelectorAll('.nav-card').forEach(card => {
+                    items.push({
+                        type: '导航',
+                        title: card.querySelector('.nav-card-title').textContent,
+                        url: card.href,
+                        desc: card.querySelector('.nav-card-desc').textContent,
+                        icon: 'fa-link'
+                    });
+                });
+                
+                // Scrape blog posts
+                document.querySelectorAll('.post-card').forEach(card => {
+                    items.push({
+                        type: '博客',
+                        title: card.querySelector('.post-card-title').textContent,
+                        url: card.querySelector('.post-card-title').href,
+                        desc: card.querySelector('.post-card-summary').textContent,
+                        icon: 'fa-book-open'
+                    });
+                });
+
+                // Scrape bookmark items
+                document.querySelectorAll('.bookmark-card').forEach(card => {
+                    items.push({
+                        type: '收藏',
+                        title: card.querySelector('.bookmark-title').textContent,
+                        url: card.querySelector('.bookmark-link-btn').href,
+                        desc: card.querySelector('.bookmark-desc').textContent,
+                        icon: 'fa-bookmark'
+                    });
+                });
+
+                // Filter
+                const filtered = items.filter(item => 
+                    item.title.toLowerCase().includes(query) || 
+                    item.desc.toLowerCase().includes(query)
+                );
+
+                if (filtered.length === 0) {
+                    // Try to fetch from backend if empty or we are not on homepage
+                    searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">未找到匹配内容</div>';
+                    return;
+                }
+
+                searchResultsContainer.innerHTML = '';
+                filtered.forEach(item => {
+                    const div = document.createElement('a');
+                    div.href = item.url;
+                    div.className = 'nav-card';
+                    div.style.background = 'rgba(255,255,255,0.03)';
+                    div.style.padding = '12px 16px';
+                    div.style.display = 'flex';
+                    div.style.gap = '14px';
+                    div.style.alignItems = 'center';
+                    div.innerHTML = `
+                        <div class="nav-card-icon" style="width:30px; height:30px; font-size:14px;">
+                            <i class="fa-solid ${item.icon}"></i>
+                        </div>
+                        <div style="flex-grow:1; min-width:0;">
+                            <div style="font-size:12px; color:var(--accent-blue); font-weight:600; text-transform:uppercase;">${item.type}</div>
+                            <div style="font-size:14px; font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</div>
+                            <div style="font-size:11px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.desc}</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
+                    `;
+                    searchResultsContainer.appendChild(div);
+                });
+
+            } catch (err) {
+                searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">搜索出错</div>';
+            }
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

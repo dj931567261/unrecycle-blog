@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}URL 编码与解码 | DevHub-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+        </a>
+        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🌐 URL 编码与解码</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">在本地对 URL 网址参数进行标准的转义编码与还原解码，完美支持中文字符。</p>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="tool-page-layout">
+        
+        <!-- Controls Toolbar -->
+        <div class="tool-header-row">
+            <div class="toolbar-controls">
+                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-code"></i> URL 编码
+                </button>
+                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-code-compare"></i> URL 解码
+                </button>
+            </div>
+            <div class="toolbar-controls">
+                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-trash-can"></i> 清空
+                </button>
+                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-copy"></i> 复制结果
+                </button>
+            </div>
+        </div>
+
+        <!-- Input / Output workspace split -->
+        <div class="tool-workspace">
+            
+            <!-- Left panel: Raw Input -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>原始文本 / URL</span>
+                    <span id="char-count">0 字符</span>
+                </div>
+                <textarea id="text-input" class="tool-textarea" placeholder="在此输入需要进行 URL 编码/解码的文本或网址参数..." autocomplete="off" spellcheck="false"></textarea>
+            </div>
+            
+            <!-- Right panel: Highlighted Output -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>处理结果</span>
+                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                </div>
+                <textarea id="text-output" readonly class="tool-textarea" style="background: rgba(10, 11, 14, 0.5);" placeholder="处理后的结果将在此显示..."></textarea>
+            </div>
+            
+        </div>
+        
+        <!-- Validation Error Message Banner -->
+        <div id="validation-error" class="error-banner"></div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const textInput = document.getElementById('text-input');
+    const textOutput = document.getElementById('text-output');
+    const errorBanner = document.getElementById('validation-error');
+    const encodeBtn = document.getElementById('encode-btn');
+    const decodeBtn = document.getElementById('decode-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const charCount = document.getElementById('char-count');
+    const codecStatus = document.getElementById('codec-status');
+
+    // Count chars helper
+    textInput.addEventListener('input', () => {
+        charCount.textContent = `${textInput.value.length} 字符`;
+    });
+
+    // Encode logic
+    encodeBtn.addEventListener('click', () => {
+        const value = textInput.value;
+        if (!value) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+
+        try {
+            const result = encodeURIComponent(value);
+            textOutput.value = result;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '编码成功';
+            codecStatus.style.color = 'var(--success)';
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 编码失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Decode logic
+    decodeBtn.addEventListener('click', () => {
+        const value = textInput.value.trim();
+        if (!value) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+
+        try {
+            const result = decodeURIComponent(value);
+            textOutput.value = result;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '解码成功';
+            codecStatus.style.color = 'var(--success)';
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 解码失败: 输入格式不正确，无法转义。(${err.message})`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Clear
+    clearBtn.addEventListener('click', () => {
+        textInput.value = '';
+        textOutput.value = '';
+        charCount.textContent = '0 字符';
+        errorBanner.style.display = 'none';
+        codecStatus.textContent = '就绪';
+        codecStatus.style.color = 'var(--text-muted)';
+    });
+
+    // Copy to clipboard
+    copyBtn.addEventListener('click', () => {
+        const result = textOutput.value;
+        if (!result) return;
+        
+        navigator.clipboard.writeText(result).then(() => {
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> 已复制!';
+            copyBtn.style.borderColor = 'var(--success)';
+            copyBtn.style.color = 'var(--success)';
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+                copyBtn.style.borderColor = '';
+                copyBtn.style.color = '';
+            }, 1500);
+        });
+    });
+</script>
+{% endblock %}

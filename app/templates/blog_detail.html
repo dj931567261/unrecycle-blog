@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} | DevHub-Me{% endblock %}
+{% block description %}{{ post.summary or post.content[:150] }}{% endblock %}
+
+{% block content %}
+
+    <div class="blog-detail-container">
+        
+        <!-- Back Link -->
+        <div style="margin-bottom: 24px;">
+            <a href="/blog" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-arrow-left"></i> 返回文章列表
+            </a>
+        </div>
+
+        <!-- Article Header -->
+        <header class="blog-detail-header">
+            <div class="post-meta" style="margin-bottom: 12px;">
+                <span class="post-category" style="font-size: 14px; font-weight: 600; color: var(--accent-blue);">{{ post.category }}</span>
+                <span>&bull;</span>
+                <span>{{ post.created_at | datetime("%Y年%m月%d日") }}</span>
+                <span>&bull;</span>
+                <span><i class="fa-solid fa-eye"></i> {{ post.views }} 次阅读</span>
+            </div>
+            <h1>{{ post.title }}</h1>
+            
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 16px;">
+                {% if post.tags %}
+                    {% for tag in post.tags.split(',') %}
+                        <span class="tag-badge">#{{ tag.strip() }}</span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Markdown Body -->
+        <div class="glass-card" style="padding: 40px; margin-bottom: 40px; border-color: rgba(255, 255, 255, 0.08);">
+            <div class="markdown-body">
+                {{ post.content | markdown | safe }}
+            </div>
+        </div>
+        
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Custom JS to add copy code button to every code block
+    window.addEventListener('DOMContentLoaded', () => {
+        const codeBlocks = document.querySelectorAll('.markdown-body pre');
+        codeBlocks.forEach(block => {
+            // Check if it already has relative positioning
+            block.style.position = 'relative';
+            
+            // Create copy button
+            const button = document.createElement('button');
+            button.className = 'btn-icon';
+            button.style.position = 'absolute';
+            button.style.top = '10px';
+            button.style.right = '10px';
+            button.style.width = '30px';
+            button.style.height = '30px';
+            button.style.fontSize = '12px';
+            button.style.background = 'rgba(255, 255, 255, 0.05)';
+            button.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+            button.innerHTML = '<i class="fa-regular fa-copy"></i>';
+            button.title = '复制代码';
+            
+            block.appendChild(button);
+            
+            button.addEventListener('click', () => {
+                const code = block.querySelector('code');
+                let codeText = code ? code.innerText : block.innerText;
+                
+                // Exclude the button text itself if it was copied
+                if (codeText.endsWith('复制代码')) {
+                    codeText = codeText.slice(0, -4);
+                }
+                
+                navigator.clipboard.writeText(codeText).then(() => {
+                    button.innerHTML = '<i class="fa-solid fa-check" style="color: var(--success);"></i>';
+                    button.style.borderColor = 'var(--success)';
+                    
+                    setTimeout(() => {
+                        button.innerHTML = '<i class="fa-regular fa-copy"></i>';
+                        button.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    }, 2000);
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

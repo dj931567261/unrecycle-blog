@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+
+{% block title %}Unix 时间戳转换 | DevHub-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+        </a>
+        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">⏱️ Unix 时间戳转换</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">在 Unix 时间戳（秒数/毫秒数）与人类可读的日期时间（北京时间 GMT+8 / UTC 国际标准时间）之间进行快速双向转换。</p>
+    </div>
+
+    <!-- Current Live Time display board -->
+    <div class="glass-card" style="margin-bottom: 24px; padding: 20px; border-color: rgba(139, 92, 246, 0.2); background: linear-gradient(135deg, rgba(18,20,25,0.8), rgba(28,20,40,0.5));">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">当前实时系统时间</span>
+                <div style="display: flex; align-items: baseline; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
+                    <span id="live-time-str" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--text-primary);">2026-05-25 17:34:25</span>
+                    <span id="live-time-zone" style="font-size: 12px; color: var(--accent-purple); font-weight: 600;">GMT+8</span>
+                </div>
+            </div>
+            <div>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unix 时间戳</span>
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
+                    <span id="live-stamp-sec" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--accent-blue);">1779836065</span>
+                    <span style="font-size: 12px; color: var(--text-muted);">秒 (s)</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="clock-toggle-btn" class="btn btn-secondary" style="padding: 8px 12px;" title="暂停时间刷新">
+                    <i class="fa-solid fa-pause"></i> 暂停
+                </button>
+                <button id="clock-copy-btn" class="btn btn-primary" style="padding: 8px 12px;" title="复制当前时间戳">
+                    <i class="fa-solid fa-copy"></i> 复制秒
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Converter Grid -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px;">
+        
+        <!-- Left: Timestamp to Date -->
+        <div class="glass-card" style="display: flex; flex-direction: column; gap: 20px;">
+            <h3 style="font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-arrow-right-long" style="color: var(--accent-blue);"></i> 时间戳 ➔ 日期时间
+            </h3>
+            
+            <div class="form-group">
+                <label for="input-timestamp">Unix 时间戳 (Timestamp)</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="input-timestamp" class="form-control" style="font-family: var(--font-mono); font-size: 15px;" placeholder="例如: 1779836065">
+                    <button id="ts-to-date-current" class="btn btn-secondary" style="white-space: nowrap; padding: 0 12px;">当前值</button>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                    <label for="ts-unit">时间戳单位</label>
+                    <select id="ts-unit" class="form-control" style="cursor: pointer;">
+                        <option value="s" selected>秒 (10位)</option>
+                        <option value="ms">毫秒 (13位)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ts-timezone">目标时区</label>
+                    <select id="ts-timezone" class="form-control" style="cursor: pointer;">
+                        <option value="local" selected>北京时间 (GMT+8)</option>
+                        <option value="utc">UTC 国际时间</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="btn-ts-to-date" class="btn btn-primary" style="width: 100%;"><i class="fa-solid fa-calculator"></i> 转换成日期时间</button>
+            
+            <div class="form-group" style="margin-top: 10px;">
+                <label>转换结果 (Date Time String)</label>
+                <div style="position: relative;">
+                    <input type="text" id="output-datetime" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-blue); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果将在此显示...">
+                    <button id="copy-output-date" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制结果">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Date to Timestamp -->
+        <div class="glass-card" style="display: flex; flex-direction: column; gap: 20px;">
+            <h3 style="font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-arrow-right-long" style="color: var(--accent-purple);"></i> 日期时间 ➔ 时间戳
+            </h3>
+            
+            <div class="form-group">
+                <label for="input-datetime">日期时间字符串 (Date Time)</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="input-datetime" class="form-control" style="font-family: var(--font-mono); font-size: 15px;" placeholder="格式如: 2026-05-25 17:34:25">
+                    <button id="date-to-ts-current" class="btn btn-secondary" style="white-space: nowrap; padding: 0 12px;">当前值</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="date-timezone">输入时区</label>
+                <select id="date-timezone" class="form-control" style="cursor: pointer;">
+                    <option value="local" selected>北京时间 (GMT+8)</option>
+                    <option value="utc">UTC 国际时间</option>
+                </select>
+            </div>
+            
+            <button id="btn-date-to-ts" class="btn btn-primary" style="width: 100%; background: var(--accent-gradient);"><i class="fa-solid fa-calculator"></i> 转换成时间戳</button>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+                <div class="form-group">
+                    <label>秒数 (10位)</label>
+                    <div style="position: relative;">
+                        <input type="text" id="output-stamp-sec" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-purple); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果...">
+                        <button id="copy-output-stamp-sec" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制秒数">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>毫秒数 (13位)</label>
+                    <div style="position: relative;">
+                        <input type="text" id="output-stamp-ms" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-purple); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果...">
+                        <button id="copy-output-stamp-ms" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制毫秒数">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Error Toast Notification Banner -->
+    <div id="conversion-error" class="error-banner" style="margin-bottom: 40px;"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Live Clock variables
+    const liveTimeStr = document.getElementById('live-time-str');
+    const liveStampSec = document.getElementById('live-stamp-sec');
+    const clockToggleBtn = document.getElementById('clock-toggle-btn');
+    const clockCopyBtn = document.getElementById('clock-copy-btn');
+    
+    // TS -> Date UI
+    const inputTimestamp = document.getElementById('input-timestamp');
+    const tsToDateCurrent = document.getElementById('ts-to-date-current');
+    const tsUnit = document.getElementById('ts-unit');
+    const tsTimezone = document.getElementById('ts-timezone');
+    const btnTsToDate = document.getElementById('btn-ts-to-date');
+    const outputDatetime = document.getElementById('output-datetime');
+    const copyOutputDate = document.getElementById('copy-output-date');
+    
+    // Date -> TS UI
+    const inputDatetime = document.getElementById('input-datetime');
+    const dateToTsCurrent = document.getElementById('date-to-ts-current');
+    const dateTimezone = document.getElementById('date-timezone');
+    const btnDateToTs = document.getElementById('btn-date-to-ts');
+    const outputStampSec = document.getElementById('output-stamp-sec');
+    const outputStampMs = document.getElementById('output-stamp-ms');
+    const copyOutputStampSec = document.getElementById('copy-output-stamp-sec');
+    const copyOutputStampMs = document.getElementById('copy-output-stamp-ms');
+    
+    const errorBanner = document.getElementById('conversion-error');
+
+    let clockInterval = null;
+    let isClockRunning = true;
+
+    // Helper to format Date object into YYYY-MM-DD HH:mm:ss
+    function formatDate(date, isUtc = false) {
+        const year = isUtc ? date.getUTCFullYear() : date.getFullYear();
+        const month = String((isUtc ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
+        const day = String(isUtc ? date.getUTCDate() : date.getDate()).padStart(2, '0');
+        const hours = String(isUtc ? date.getUTCHours() : date.getHours()).padStart(2, '0');
+        const minutes = String(isUtc ? date.getUTCMinutes() : date.getMinutes()).padStart(2, '0');
+        const seconds = String(isUtc ? date.getUTCSeconds() : date.getSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
+    // Update Live clock
+    function updateLiveClock() {
+        const now = new Date();
+        liveTimeStr.textContent = formatDate(now);
+        liveStampSec.textContent = Math.floor(now.getTime() / 1000);
+    }
+
+    function startClock() {
+        isClockRunning = true;
+        updateLiveClock();
+        clockInterval = setInterval(updateLiveClock, 1000);
+        clockToggleBtn.innerHTML = '<i class="fa-solid fa-pause"></i> 暂停';
+        clockToggleBtn.className = 'btn btn-secondary';
+    }
+
+    function stopClock() {
+        isClockRunning = false;
+        clearInterval(clockInterval);
+        clockToggleBtn.innerHTML = '<i class="fa-solid fa-play"></i> 恢复';
+        clockToggleBtn.className = 'btn btn-primary';
+    }
+
+    // Toggle Clock button trigger
+    clockToggleBtn.addEventListener('click', () => {
+        if (isClockRunning) {
+            stopClock();
+        } else {
+            startClock();
+        }
+    });
+
+    // Copy live clock stamp
+    clockCopyBtn.addEventListener('click', () => {
+        const stamp = liveStampSec.textContent;
+        navigator.clipboard.writeText(stamp).then(() => {
+            const originalText = clockCopyBtn.innerHTML;
+            clockCopyBtn.innerHTML = '<i class="fa-solid fa-check"></i> 已复制';
+            setTimeout(() => {
+                clockCopyBtn.innerHTML = originalText;
+            }, 1000);
+        });
+    });
+
+    // Copy generic results helper
+    function setupCopy(btn, targetInput) {
+        btn.addEventListener('click', () => {
+            const val = targetInput.value;
+            if (!val) return;
+            navigator.clipboard.writeText(val).then(() => {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--success);"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                }, 1200);
+            });
+        });
+    }
+
+    setupCopy(copyOutputDate, outputDatetime);
+    setupCopy(copyOutputStampSec, outputStampSec);
+    setupCopy(copyOutputStampMs, outputStampMs);
+
+    // Initializer inputs on page load
+    window.addEventListener('load', () => {
+        startClock();
+        
+        // Pre-fill converters
+        const now = new Date();
+        inputTimestamp.value = Math.floor(now.getTime() / 1000);
+        inputDatetime.value = formatDate(now);
+    });
+
+    // Prefill current values
+    tsToDateCurrent.addEventListener('click', () => {
+        const nowStamp = Math.floor(new Date().getTime() / 1000);
+        inputTimestamp.value = tsUnit.value === 'ms' ? nowStamp * 1000 : nowStamp;
+    });
+
+    dateToTsCurrent.addEventListener('click', () => {
+        inputDatetime.value = formatDate(new Date());
+    });
+
+    // CONVERT: TIMESTAMP ➔ DATE
+    btnTsToDate.addEventListener('click', () => {
+        errorBanner.style.display = 'none';
+        const tsVal = inputTimestamp.value.trim();
+        if (!tsVal) return;
+
+        // Check if value is a numeric string
+        if (!/^\d+$/.test(tsVal)) {
+            errorBanner.textContent = '❌ 转换失败: 请输入合法的纯数字时间戳。';
+            errorBanner.style.display = 'block';
+            return;
+        }
+
+        const isMs = tsUnit.value === 'ms';
+        let ms = parseInt(tsVal);
+        if (!isMs) {
+            ms = ms * 1000;
+        }
+
+        const dateObj = new Date(ms);
+        if (isNaN(dateObj.getTime())) {
+            errorBanner.textContent = '❌ 转换失败: 时间戳数值非法。';
+            errorBanner.style.display = 'block';
+            return;
+        }
+
+        const isUtc = tsTimezone.value === 'utc';
+        outputDatetime.value = formatDate(dateObj, isUtc);
+    });
+
+    // CONVERT: DATE ➔ TIMESTAMP
+    btnDateToTs.addEventListener('click', () => {
+        errorBanner.style.display = 'none';
+        const dateStr = inputDatetime.value.trim();
+        if (!dateStr) return;
+
+        // Regex parsing to support various date time strings (e.g. YYYY-MM-DD HH:mm:ss)
+        // Split by dashes, slashes, spaces, colons
+        const parts = dateStr.split(/[-/\s:]+/);
+        if (parts.length < 3) {
+            errorBanner.textContent = '❌ 转换失败: 日期格式无法解析。推荐格式：YYYY-MM-DD HH:mm:ss';
+            errorBanner.style.display = 'block';
+            return;
+        }
+
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        const hour = parts[3] ? parseInt(parts[3]) : 0;
+        const min = parts[4] ? parseInt(parts[4]) : 0;
+        const sec = parts[5] ? parseInt(parts[5]) : 0;
+
+        let dateObj;
+        const isUtc = dateTimezone.value === 'utc';
+
+        if (isUtc) {
+            dateObj = new Date(Date.UTC(year, month, day, hour, min, sec));
+        } else {
+            dateObj = new Date(year, month, day, hour, min, sec);
+        }
+
+        if (isNaN(dateObj.getTime())) {
+            errorBanner.textContent = '❌ 转换失败: 无法计算合法的日期值，请确认输入的年、月、日数值是否正确。';
+            errorBanner.style.display = 'block';
+            return;
+        }
+
+        const msVal = dateObj.getTime();
+        outputStampSec.value = Math.floor(msVal / 1000);
+        outputStampMs.value = msVal;
+    });
+</script>
+{% endblock %}

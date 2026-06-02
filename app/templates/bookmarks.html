@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}灵感书签 | DevHub-Me{% endblock %}
+
+{% block content %}
+
+    <style>
+        .filter-tag-btn {
+            padding: 6px 14px;
+            font-size: 13px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .filter-tag-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .filter-tag-btn.active {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--text-primary);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+    </style>
+
+    <div style="margin-bottom: 30px; margin-top: 20px;">
+        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">📌 灵感与好站书签</h1>
+        <p style="color: var(--text-secondary); max-width: 600px;">这里记录了我日常浏览网页、查阅 GitHub 开源项目或学习时随手保存的一些优质网站、文章和工具，方便随时回溯。</p>
+    </div>
+
+    <!-- Tags Filter Bar -->
+    {% if tags %}
+    <div class="tags-filter-bar" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; align-items: center; background: rgba(255,255,255,0.01); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+        <span style="font-size: 13px; color: var(--text-muted); margin-right: 6px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-filter"></i> 标签过滤:
+        </span>
+        <button class="filter-tag-btn active" onclick="filterBookmarks('all', this)">全部</button>
+        {% for tag in tags %}
+            <button class="filter-tag-btn" onclick="filterBookmarks('{{ tag }}', this)">{{ tag }}</button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Bookmarks Grid -->
+    <div class="bookmarks-grid">
+        {% if bookmarks %}
+            {% for bookmark in bookmarks %}
+                <div class="glass-card bookmark-card" data-tags="{{ bookmark.tags or '' }}">
+                    <div class="bookmark-header">
+                        <span class="tag-badge" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); font-weight: 600;"># 收藏</span>
+                        <a href="{{ bookmark.url }}" target="_blank" class="bookmark-link-btn">
+                            访问原网站 <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i>
+                        </a>
+                    </div>
+                    <h3 class="bookmark-title">{{ bookmark.title }}</h3>
+                    <p class="bookmark-desc">{{ bookmark.description or "无收藏说明" }}</p>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.04);">
+                        <div class="tags-list">
+                            {% if bookmark.tags %}
+                                {% for tag in bookmark.tags.split(',') %}
+                                    <span class="tag-badge" style="font-size: 10px;">{{ tag.strip() }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        <span style="font-size: 11px; color: var(--text-muted);">{{ bookmark.created_at | datetime("%m-%d") }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="glass-card" style="grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-secondary);">
+                <i class="fa-solid fa-bookmark" style="font-size: 40px; margin-bottom: 16px; color: var(--text-muted);"></i>
+                <p>暂无灵感书签。快登录管理后台添加吧！</p>
+                {% if is_admin %}
+                    <a href="/admin" class="btn btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-plus"></i> 添加收藏</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterBookmarks(tag, btn) {
+        // Toggle active button class
+        document.querySelectorAll('.filter-tag-btn').forEach(button => {
+            button.classList.remove('active');
+        });
+        btn.classList.add('active');
+
+        // Filter cards
+        const cards = document.querySelectorAll('.bookmark-card');
+        cards.forEach(card => {
+            if (tag === 'all') {
+                card.style.display = 'flex';
+            } else {
+                const cardTagsStr = card.getAttribute('data-tags') || '';
+                const cardTags = cardTagsStr.split(',').map(t => t.trim());
+                if (cardTags.includes(tag)) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

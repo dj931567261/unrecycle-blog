@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}开发者工具箱 | DevHub-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-bottom: 40px; margin-top: 20px;">
+        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">🛠️ 实用小工具箱</h1>
+        <p style="color: var(--text-secondary); max-width: 600px;">这些小工具完全在你的本地浏览器运行，处理过程不经过任何后端服务器，保证你敏感数据（如代码、凭证等）的绝对安全。</p>
+    </div>
+
+    <!-- Tools grid -->
+    <div class="tools-grid">
+        
+        <!-- JSON Formatter -->
+        <a href="/tools/json-formatter" class="glass-card tool-card">
+            <div class="tool-card-icon">📁</div>
+            <h3 class="tool-card-title">JSON 格式化与校验</h3>
+            <p class="tool-card-desc">对 JSON 字符串进行本地解析、验证语法错误，并缩进美化或单行压缩，支持实时行号定位。</p>
+            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
+        </a>
+        
+        <!-- Timestamp Converter -->
+        <a href="/tools/timestamp-converter" class="glass-card tool-card">
+            <div class="tool-card-icon">⏱️</div>
+            <h3 class="tool-card-title">Unix 时间戳转换</h3>
+            <p class="tool-card-desc">在 Unix 时间戳（秒/毫秒）与北京时间/UTC时间之间进行双向快速转换，支持实时时间时钟。</p>
+            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
+        </a>
+        
+        <!-- Base64 Codec -->
+        <a href="/tools/base64" class="glass-card tool-card">
+            <div class="tool-card-icon">🔐</div>
+            <h3 class="tool-card-title">Base64 编码与解码</h3>
+            <p class="tool-card-desc">快速将普通文本转换为 Base64 编码，或者将 Base64 数据还原为文本，支持 utf-8 字符集。</p>
+            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
+        </a>
+        
+        <!-- URL Codec -->
+        <a href="/tools/url-codec" class="glass-card tool-card">
+            <div class="tool-card-icon">🌐</div>
+            <h3 class="tool-card-title">URL 编码与解码</h3>
+            <p class="tool-card-desc">对网址参数进行标准的 URL 编码与解码，支持汉字及特殊符号的转义处理。</p>
+            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
+        </a>
+        
+    </div>
+
+{% endblock %}

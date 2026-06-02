@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    image: ghcr.io/YOUR_GITHUB_USERNAME/devhub-me:latest # 请替换为您的 GitHub 用户名（小写）
+    container_name: devhub-me
+    restart: always
+    ports:
+      # Bind to 127.0.0.1:8000 to prevent exposing FastAPI directly to the internet.
+      # You can proxy it through Nginx on the host. 
+      # If you don't use Nginx on the host, change it to "8000:8000".
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/data/blog.db
+      - SECRET_KEY=generate_a_secure_random_key_here_for_security
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/app/static/uploads
