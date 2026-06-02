@@ -37,7 +37,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ env.OWNER_LOWER }}/devhub-me:latest
-            ghcr.io/${{ env.OWNER_LOWER }}/devhub-me:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LOWER }}/unrecycle-me:latest
+            ghcr.io/${{ env.OWNER_LOWER }}/unrecycle-me:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

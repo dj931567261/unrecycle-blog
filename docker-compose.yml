@@ -3,8 +3,8 @@ version: '3.8'
 services:
   web:
     build: .
-    image: ghcr.io/YOUR_GITHUB_USERNAME/devhub-me:latest # 请替换为您的 GitHub 用户名（小写）
-    container_name: devhub-me
+    image: ghcr.io/YOUR_GITHUB_USERNAME/unrecycle-me:latest # 请替换为您的 GitHub 用户名（小写）
+    container_name: unrecycle-me
     restart: always
     ports:
       # Bind to 127.0.0.1:8000 to prevent exposing FastAPI directly to the internet.
