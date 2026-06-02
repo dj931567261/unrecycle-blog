@@ -48,27 +48,25 @@ body {
     position: relative;
 }
 
-/* Ambient glow backgrounds */
+/* Ambient glow backgrounds - optimized with radial-gradients for high-performance rendering (no expensive filter: blur) */
 body::before, body::after {
     content: '';
     position: absolute;
     width: 600px;
     height: 600px;
-    border-radius: 50%;
-    filter: blur(150px);
     z-index: -1;
     opacity: 0.12;
     pointer-events: none;
 }
 
 body::before {
-    background: var(--accent-blue);
+    background: radial-gradient(circle, var(--accent-blue) 0%, transparent 70%);
     top: -200px;
     left: -200px;
 }
 
 body::after {
-    background: var(--accent-purple);
+    background: radial-gradient(circle, var(--accent-purple) 0%, transparent 70%);
     bottom: -200px;
     right: -200px;
 }
@@ -76,7 +74,7 @@ body::after {
 a {
     color: inherit;
     text-decoration: none;
-    transition: var(--transition-smooth);
+    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Scrollbar Customization */
@@ -167,7 +165,7 @@ header.site-header {
     width: 0;
     height: 2px;
     background: var(--accent-gradient);
-    transition: var(--transition-smooth);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-link:hover::after, .nav-link.active::after {
@@ -191,7 +189,7 @@ header.site-header {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: var(--transition-smooth);
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-icon:hover {
@@ -212,7 +210,7 @@ header.site-header {
     font-family: var(--font-body);
     font-size: 14px;
     cursor: pointer;
-    transition: var(--transition-smooth);
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border: none;
 }
 
@@ -256,11 +254,15 @@ header.site-header {
     border: 1px solid var(--border-color);
     border-radius: 16px;
     padding: 24px;
-    transition: var(--transition-bounce);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .glass-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-4px) translate3d(0, 0, 0);
+    -webkit-transform: translateY(-4px) translate3d(0, 0, 0);
     border-color: rgba(255, 255, 255, 0.15);
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 15px var(--border-glow);
 }
@@ -326,7 +328,7 @@ header.site-header {
     color: var(--text-primary);
     font-size: 15px;
     outline: none;
-    transition: var(--transition-smooth);
+    transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-input:focus {
@@ -403,13 +405,17 @@ header.site-header {
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
-    transition: var(--transition-smooth);
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition: transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .nav-card:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
+    transform: translateY(-2px) translate3d(0, 0, 0);
+    -webkit-transform: translateY(-2px) translate3d(0, 0, 0);
 }
 
 .nav-card-icon {
@@ -872,7 +878,7 @@ footer.site-footer {
     color: var(--text-primary);
     font-size: 14px;
     outline: none;
-    transition: var(--transition-smooth);
+    transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .form-control:focus {
@@ -949,13 +955,14 @@ footer.site-footer {
     bottom: 0;
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
     pointer-events: none;
-    transition: var(--transition-smooth);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal-backdrop.open {
