@@ -89,8 +89,14 @@ os.makedirs("app/static/css", exist_ok=True)
 os.makedirs("app/static/js", exist_ok=True)
 os.makedirs("app/templates", exist_ok=True)
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Mount static files with browser cache headers (Cache-Control)
+class CachedStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=604800"
+        return response
+
+app.mount("/static", CachedStaticFiles(directory="app/static"), name="static")
 
 # Configure templates
 templates = Jinja2Templates(directory="app/templates")
