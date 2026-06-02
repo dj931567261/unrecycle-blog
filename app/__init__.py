@@ -1,1 +1,1 @@
-# DevHub-Me application package.
+# Unrecycle-Me application package.

@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")
 
 # Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "devhub_super_secret_key_change_me_in_production")
+SECRET_KEY = os.getenv("SECRET_KEY", "unrecycle_super_secret_key_change_me_in_production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 

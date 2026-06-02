@@ -15,7 +15,7 @@ from app.config import UPLOAD_DIR, ADMIN_USERNAME
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="DevHub-Me", description="Personal Developer Dashboard & Blog")
+app = FastAPI(title="Unrecycle-Me", description="Personal Developer Dashboard & Blog")
 
 import time
 @app.middleware("http")
@@ -46,8 +46,8 @@ def seed_initial_data():
         # Check and seed Posts
         if db.query(models.Post).count() == 0:
             first_post = models.Post(
-                title="我的个人空间 DevHub-Me 正式发布！",
-                slug="devhub-me-released",
+                title="我的个人空间 Unrecycle-Me 正式发布！",
+                slug="unrecycle-me-released",
                 content="""欢迎来到我的个人数字花园！
 
 这个系统是我专门设计用来管理我的**技术文章**、**网址导航**、**网站收藏**以及**日常小工具**的平台。

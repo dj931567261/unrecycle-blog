@@ -1,4 +1,4 @@
-name: DevHub-Me CI/CD
+name: Unrecycle-Me CI/CD
 
 on:
   push:
