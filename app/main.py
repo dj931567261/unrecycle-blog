@@ -223,7 +223,9 @@ async def login_page(request: Request, current_user: Optional[str] = Depends(aut
     return templates.TemplateResponse(request, "login.html", {})
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+async def admin_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=303)
     import traceback
     try:
         posts = crud.get_posts(db, published_only=False)
