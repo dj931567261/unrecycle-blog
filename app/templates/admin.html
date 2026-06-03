@@ -259,8 +259,14 @@
                 <!-- Markdown Editor with split preview -->
                 <div class="form-group" style="margin-top: 16px; margin-bottom: 20px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <label style="margin-bottom:0;">Markdown 内容正文</label>
-                        <span style="font-size:12px; color:var(--text-muted);">拖拽/粘贴图片可直接上传并插入</span>
+                        <label style="margin-bottom:0; display:flex; align-items:center; gap:10px;">
+                            Markdown 内容正文
+                            <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; line-height:1; display:flex; align-items:center; gap:4px;" onclick="document.getElementById('image-upload-input').click()">
+                                <i class="fa-solid fa-image"></i> 上传图片
+                            </button>
+                            <input type="file" id="image-upload-input" style="display:none;" accept="image/*" onchange="handleImageUploadSelect(this)">
+                        </label>
+                        <span style="font-size:12px; color:var(--text-muted);">点击按钮、拖拽或粘贴图片均可上传</span>
                     </div>
                     <div class="md-editor-split">
                         <textarea id="post-content" required class="md-editor-input" placeholder="支持标准 Markdown 语法..." oninput="updateEditorPreview()"></textarea>
@@ -441,6 +447,27 @@
     // Drag-and-Drop Image Uploader logic in Markdown Editor textarea
     postContent.addEventListener('paste', handleImagePaste);
     postContent.addEventListener('drop', handleImageDrop);
+
+    async function handleImageUploadSelect(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        
+        const filename = file.name;
+        
+        // Inject upload state placeholder
+        const pos = postContent.selectionStart;
+        const text = postContent.value;
+        postContent.value = text.slice(0, pos) + "\n![上传中...](Uploading...)\n" + text.slice(pos);
+        
+        const url = await uploadImageFile(file);
+        if (url) {
+            postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![${filename}](${url})`);
+        } else {
+            postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![上传失败]()`);
+        }
+        input.value = ''; // Reset file input
+        updateEditorPreview();
+    }
 
     async function uploadImageFile(file) {
         const formData = new FormData();

@@ -5,6 +5,126 @@
 
 {% block content %}
 
+    <style>
+        /* Article Hyperlink styles: blue color and underline */
+        .markdown-body a {
+            color: var(--accent-blue, #3b82f6) !important;
+            text-decoration: underline !important;
+            text-underline-offset: 4px;
+            font-weight: 500;
+            transition: opacity 0.2s ease;
+        }
+        .markdown-body a:hover {
+            opacity: 0.8;
+        }
+
+        /* Responsive Layout Overrides */
+        .blog-detail-container {
+            max-width: 1100px !important; /* Wider maximum bounds to accommodate sidebar */
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        .blog-detail-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 40px;
+            align-items: start;
+            margin-top: 24px;
+        }
+
+        .blog-sidebar {
+            position: sticky;
+            top: 100px;
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+
+        .blog-sidebar-card {
+            background: var(--bg-surface);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        .toc-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .toc-nav {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toc-item.toc-h2 {
+            font-weight: 500;
+        }
+
+        .toc-item.toc-h3 {
+            padding-left: 14px;
+            font-size: 13px;
+        }
+
+        .toc-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: block;
+            border-left: 2px solid transparent;
+            padding-left: 8px;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toc-link:hover {
+            color: var(--accent-blue);
+            padding-left: 12px;
+        }
+
+        .toc-link.active {
+            color: var(--accent-blue);
+            border-left-color: var(--accent-blue);
+            font-weight: 600;
+            padding-left: 12px;
+        }
+
+        /* Hide sidebar on screens narrower than 1024px */
+        @media (max-width: 1023px) {
+            .blog-detail-container {
+                max-width: 800px !important;
+            }
+            .blog-detail-layout {
+                grid-template-columns: 1fr;
+            }
+            .blog-sidebar {
+                display: none;
+            }
+        }
+    </style>
+
     <div class="blog-detail-container">
         
         <!-- Back Link -->
@@ -14,30 +134,47 @@
             </a>
         </div>
 
-        <!-- Article Header -->
-        <header class="blog-detail-header">
-            <div class="post-meta" style="margin-bottom: 12px;">
-                <span class="post-category" style="font-size: 14px; font-weight: 600; color: var(--accent-blue);">{{ post.category }}</span>
-                <span>&bull;</span>
-                <span>{{ post.created_at | datetime("%Y年%m月%d日") }}</span>
-                <span>&bull;</span>
-                <span><i class="fa-solid fa-eye"></i> {{ post.views }} 次阅读</span>
-            </div>
-            <h1>{{ post.title }}</h1>
-            
-            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 16px;">
-                {% if post.tags %}
-                    {% for tag in post.tags.split(',') %}
-                        <span class="tag-badge">#{{ tag.strip() }}</span>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        </header>
+        <div class="blog-detail-layout">
+            <!-- Left Sidebar (TOC) -->
+            <aside class="blog-sidebar">
+                <div class="blog-sidebar-card">
+                    <h4 class="toc-title">
+                        <i class="fa-solid fa-align-left" style="color: var(--accent-blue);"></i> 文章目录
+                    </h4>
+                    <nav id="article-toc" class="toc-nav">
+                        <!-- Populated via Javascript -->
+                    </nav>
+                </div>
+            </aside>
 
-        <!-- Markdown Body -->
-        <div class="glass-card" style="padding: 40px; margin-bottom: 40px; border-color: rgba(255, 255, 255, 0.08);">
-            <div class="markdown-body">
-                {{ post.content | markdown | safe }}
+            <!-- Right Content (Article Details) -->
+            <div class="blog-main-content">
+                <!-- Article Header -->
+                <header class="blog-detail-header">
+                    <div class="post-meta" style="margin-bottom: 12px;">
+                        <span class="post-category" style="font-size: 14px; font-weight: 600; color: var(--accent-blue);">{{ post.category }}</span>
+                        <span>&bull;</span>
+                        <span>{{ post.created_at | datetime("%Y年%m月%d日") }}</span>
+                        <span>&bull;</span>
+                        <span><i class="fa-solid fa-eye"></i> {{ post.views }} 次阅读</span>
+                    </div>
+                    <h1>{{ post.title }}</h1>
+                    
+                    <div style="display: flex; justify-content: center; gap: 8px; margin-top: 16px;">
+                        {% if post.tags %}
+                            {% for tag in post.tags.split(',') %}
+                                <span class="tag-badge">#{{ tag.strip() }}</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </header>
+
+                <!-- Markdown Body -->
+                <div class="glass-card" style="padding: 40px; margin-bottom: 40px; border-color: rgba(255, 255, 255, 0.08);">
+                    <div class="markdown-body">
+                        {{ post.content | markdown | safe }}
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -47,14 +184,12 @@
 
 {% block scripts %}
 <script>
-    // Custom JS to add copy code button to every code block
+    // Copy code button script
     window.addEventListener('DOMContentLoaded', () => {
         const codeBlocks = document.querySelectorAll('.markdown-body pre');
         codeBlocks.forEach(block => {
-            // Check if it already has relative positioning
             block.style.position = 'relative';
             
-            // Create copy button
             const button = document.createElement('button');
             button.className = 'btn-icon';
             button.style.position = 'absolute';
@@ -74,7 +209,6 @@
                 const code = block.querySelector('code');
                 let codeText = code ? code.innerText : block.innerText;
                 
-                // Exclude the button text itself if it was copied
                 if (codeText.endsWith('复制代码')) {
                     codeText = codeText.slice(0, -4);
                 }
@@ -90,6 +224,108 @@
                 });
             });
         });
+    });
+
+    // Dynamic Table of Contents (TOC) and Scroll Spy
+    window.addEventListener('DOMContentLoaded', () => {
+        const markdownBody = document.querySelector('.markdown-body');
+        const tocNav = document.getElementById('article-toc');
+        if (!markdownBody || !tocNav) return;
+
+        const headings = markdownBody.querySelectorAll('h2, h3');
+        if (headings.length === 0) {
+            tocNav.innerHTML = '<span style="color: var(--text-muted); font-size: 13px; font-style: italic;">本文暂无目录</span>';
+            return;
+        }
+
+        const ul = document.createElement('ul');
+        ul.className = 'toc-list';
+
+        const tocLinks = [];
+
+        headings.forEach((heading, index) => {
+            // Assign a unique ID if not present
+            if (!heading.id) {
+                const cleanText = heading.textContent.trim().toLowerCase()
+                    .replace(/[^\w\u4e00-\u9fa5\s-]/g, '') // Keep alphanumeric, Chinese, spaces, and dashes
+                    .replace(/\s+/g, '-')                  // Replace spaces with dashes
+                    .replace(/-+/g, '-');                  // Collapse duplicates
+                heading.id = cleanText || 'section-' + (index + 1);
+            }
+
+            const li = document.createElement('li');
+            li.className = 'toc-item ' + (heading.tagName.toLowerCase() === 'h2' ? 'toc-h2' : 'toc-h3');
+
+            const a = document.createElement('a');
+            a.href = '#' + heading.id;
+            a.className = 'toc-link';
+            a.textContent = heading.textContent;
+
+            // Anchor scroll click handler
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.getElementById(heading.id);
+                if (target) {
+                    const headerOffset = 90; // offset height of the site sticky navbar
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.scrollY - headerOffset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Manually set active class
+                    tocLinks.forEach(link => link.classList.remove('active'));
+                    a.classList.add('active');
+                }
+            });
+
+            li.appendChild(a);
+            ul.appendChild(li);
+            tocLinks.push(a);
+        });
+
+        tocNav.appendChild(ul);
+
+        // Scroll Spy Implementation
+        const spyHandler = () => {
+            const scrollPos = window.scrollY || window.pageYOffset;
+            const triggerOffset = 110; // offset value for highlighting trigger
+            
+            let activeHeadingIndex = -1;
+            
+            for (let i = 0; i < headings.length; i++) {
+                const heading = headings[i];
+                const headingTop = heading.getBoundingClientRect().top + scrollPos;
+                
+                if (scrollPos + triggerOffset >= headingTop) {
+                    activeHeadingIndex = i;
+                } else {
+                    break;
+                }
+            }
+            
+            tocLinks.forEach((link, i) => {
+                if (i === activeHeadingIndex) {
+                    link.classList.add('active');
+                    // Handle container scrolling if it overflows
+                    const linkRect = link.getBoundingClientRect();
+                    const sidebarRect = tocNav.getBoundingClientRect();
+                    if (linkRect.bottom > sidebarRect.bottom) {
+                        tocNav.scrollTop += (linkRect.bottom - sidebarRect.bottom) + 10;
+                    } else if (linkRect.top < sidebarRect.top) {
+                        tocNav.scrollTop -= (sidebarRect.top - linkRect.top) + 10;
+                    }
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        };
+
+        window.addEventListener('scroll', spyHandler);
+        // Call once on load
+        spyHandler();
     });
 </script>
 {% endblock %}
