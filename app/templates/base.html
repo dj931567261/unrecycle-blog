@@ -17,6 +17,14 @@
     
     <!-- Font Awesome Icons (Local) -->
     <link rel="stylesheet" href="/static/css/font-awesome.min.css">
+    
+    <!-- Theme initialization script (runs immediately to prevent flashing) -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
 
@@ -40,6 +48,10 @@
             
             <!-- Header actions (Search & Admin status) -->
             <div class="nav-actions">
+                <button id="theme-toggle-btn" class="btn-icon" title="切换主题 (明亮 / 暗黑)">
+                    <i class="fa-solid fa-sun" id="theme-icon-sun" style="display:none;"></i>
+                    <i class="fa-solid fa-moon" id="theme-icon-moon" style="display:none;"></i>
+                </button>
                 <button id="search-trigger-btn" class="btn-icon" title="搜索 (Cmd + K / Ctrl + K)">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
@@ -278,6 +290,33 @@
             } catch (err) {
                 searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">搜索出错</div>';
             }
+        });
+
+        // Theme switching handler
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const sunIcon = document.getElementById('theme-icon-sun');
+        const moonIcon = document.getElementById('theme-icon-moon');
+
+        function updateThemeUI(theme) {
+            if (theme === 'light') {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            } else {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            }
+        }
+
+        // Init theme icons
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        updateThemeUI(currentTheme);
+
+        themeToggleBtn.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeUI(newTheme);
         });
     </script>
 
