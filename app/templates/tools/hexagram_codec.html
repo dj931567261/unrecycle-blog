@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block title %}卦象密码翻译器 | Unrecycle-Me{% endblock %}
+
+{% block content %}
+
+    <style>
+        /* History panel custom styles */
+        .history-container {
+            margin-top: 24px;
+            padding: 20px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .history-table-wrapper {
+            max-height: 240px;
+            overflow-y: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.05);
+        }
+        html[data-theme="light"] .history-table-wrapper {
+            background: rgba(15, 23, 42, 0.02);
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .history-table th, .history-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .history-table th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            background: var(--panel-title-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .history-table tr:last-child td {
+            border-bottom: none;
+        }
+        .history-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .history-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        html[data-theme="light"] .history-table tbody tr:hover {
+            background: rgba(15, 23, 42, 0.02);
+        }
+        .history-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .history-badge.encode {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+        }
+        .history-badge.decode {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--accent-blue);
+        }
+        .history-badge.auto {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--warning);
+        }
+        .history-text-col {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .history-action-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        .history-action-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-btn-hover);
+            border-color: var(--border-color);
+        }
+        .history-action-btn.delete:hover {
+            color: var(--error);
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+    </style>
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+        </a>
+        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">☯️ 卦象密码翻译器</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">将普通文本隐写为周易六十四卦象符号，或将卦象密文还原为原文。支持自动识别与本地安全编解码。</p>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="tool-page-layout">
+        
+        <!-- Controls Toolbar -->
+        <div class="tool-header-row">
+            <div class="toolbar-controls">
+                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-lock"></i> 卦象加密
+                </button>
+                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-unlock"></i> 卦象解密
+                </button>
+                <button id="auto-btn" class="btn btn-primary" style="padding: 8px 16px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 智能转换
+                </button>
+            </div>
+            <div class="toolbar-controls">
+                <button id="paste-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-clipboard"></i> 粘贴
+                </button>
+                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-trash-can"></i> 清空
+                </button>
+                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-copy"></i> 复制结果
+                </button>
+            </div>
+        </div>
+
+        <!-- Input / Output workspace split -->
+        <div class="tool-workspace" style="margin-bottom: 0;">
+            
+            <!-- Left panel: Raw Input -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>输入需要转换的内容</span>
+                    <span id="char-count">0 字符</span>
+                </div>
+                <textarea id="text-input" class="tool-textarea" placeholder="在此输入普通明文或要解密的卦象密文内容..." autocomplete="off" spellcheck="false"></textarea>
+            </div>
+            
+            <!-- Right panel: Processed Output -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>转换输出结果</span>
+                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                </div>
+                <textarea id="text-output" readonly class="tool-textarea" style="font-family: monospace; font-size: 18px; letter-spacing: 2px;" placeholder="结果将在此显示..."></textarea>
+            </div>
+            
+        </div>
+        
+        <!-- Validation Error Message Banner -->
+        <div id="validation-error" class="error-banner" style="margin-top: 15px;"></div>
+
+        <!-- History Panel -->
+        <div class="history-container glass-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-blue);"></i> 历史加解密记录 (本地存储)
+                </h3>
+                <button id="clear-history-btn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;">
+                    <i class="fa-solid fa-trash-can"></i> 清空历史
+                </button>
+            </div>
+            
+            <div class="history-table-wrapper">
+                <div id="history-list-wrapper">
+                    <!-- History Render List -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const textInput = document.getElementById('text-input');
+    const textOutput = document.getElementById('text-output');
+    const errorBanner = document.getElementById('validation-error');
+    const encodeBtn = document.getElementById('encode-btn');
+    const decodeBtn = document.getElementById('decode-btn');
+    const autoBtn = document.getElementById('auto-btn');
+    const pasteBtn = document.getElementById('paste-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const charCount = document.getElementById('char-count');
+    const codecStatus = document.getElementById('codec-status');
+
+    // 卦象编码映射表
+    const ENCODE_MAP_TABLE = {
+        "A": "䷀", "B": "䷁", "C": "䷂", "D": "䷃", "E": "䷄", "F": "䷅", "G": "䷆", "H": "䷇", 
+        "I": "䷈", "J": "䷉", "K": "䷊", "L": "䷋", "M": "䷌", "N": "䷍", "O": "䷎", "P": "䷏", 
+        "Q": "䷐", "R": "䷑", "S": "䷒", "T": "䷓", "U": "䷔", "V": "䷕", "W": "䷖", "X": "䷗", 
+        "Y": "䷘", "Z": "䷙", "a": "䷚", "b": "䷛", "c": "䷜", "d": "䷝", "e": "䷞", "f": "䷟", 
+        "g": "䷠", "h": "䷡", "i": "䷢", "j": "䷣", "k": "䷤", "l": "䷥", "m": "䷦", "n": "䷧", 
+        "o": "䷨", "p": "䷩", "q": "䷪", "r": "䷫", "s": "䷬", "t": "䷭", "u": "䷮", "v": "䷯", 
+        "w": "䷰", "x": "䷱", "y": "䷲", "z": "䷳", "0": "䷴", "1": "䷵", "2": "䷶", "3": "䷷", 
+        "4": "䷸", "5": "䷹", "6": "䷺", "7": "䷻", "8": "䷼", "9": "䷽", "+": "䷾", "/": "䷿"
+    };
+
+    // 卦象解码映射表
+    const DECODE_MAP_TABLE = {
+        "䷀": "A", "䷁": "B", "䷂": "C", "䷃": "D", "䷄": "E", "䷅": "F", "䷆": "G", "䷇": "H", 
+        "䷈": "I", "䷉": "J", "䷊": "K", "䷋": "L", "䷌": "M", "䷍": "N", "䷎": "O", "䷏": "P", 
+        "䷐": "Q", "䷑": "R", "䷒": "S", "䷓": "T", "䷔": "U", "䷕": "V", "䷖": "W", "䷗": "X", 
+        "䷘": "Y", "䷙": "Z", "䷚": "a", "䷛": "b", "䷜": "c", "䷝": "d", "䷞": "e", "䷟": "f", 
+        "䷠": "g", "䷡": "h", "䷢": "i", "䷣": "j", "䷤": "k", "䷥": "l", "䷦": "m", "䷧": "n", 
+        "䷨": "o", "䷩": "p", "䷪": "q", "䷫": "r", "䷬": "s", "䷭": "t", "䷮": "u", "䷯": "v", 
+        "䷰": "w", "䷱": "x", "䷲": "y", "䷳": "z", "䷴": "0", "䷵": "1", "䷶": "2", "䷷": "3", 
+        "䷸": "4", "䷹": "5", "䷺": "6", "䷻": "7", "䷼": "8", "䷽": "9", "䷾": "+", "䷿": "/"
+    };
+
+    // History data array
+    let historyData = [];
+
+    // Load history from localStorage
+    function loadHistory() {
+        try {
+            historyData = JSON.parse(localStorage.getItem('hexagram_history') || '[]');
+        } catch (e) {
+            historyData = [];
+        }
+        renderHistory();
+    }
+
+    // Save history data
+    function saveHistory() {
+        localStorage.setItem('hexagram_history', JSON.stringify(historyData));
+        renderHistory();
+    }
+
+    // Add new history record
+    function addHistoryRecord(type, input, output) {
+        const timestamp = new Date();
+        const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        
+        const newRecord = {
+            id: Date.now(),
+            time: timeString,
+            type: type, // 'encode' | 'decode' | 'auto_encode' | 'auto_decode'
+            input: input,
+            output: output
+        };
+
+        // Unshift to front
+        historyData.unshift(newRecord);
+
+        // Limit to 100 records, discarding oldest items at the end
+        if (historyData.length > 100) {
+            historyData.pop();
+        }
+
+        saveHistory();
+    }
+
+    // Render history panel HTML
+    function renderHistory() {
+        const listWrapper = document.getElementById('history-list-wrapper');
+        if (!listWrapper) return;
+
+        if (historyData.length === 0) {
+            listWrapper.innerHTML = `
+                <div style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+                    <i class="fa-solid fa-clock-rotate-left" style="font-size: 28px; margin-bottom: 10px; display: block; opacity: 0.4;"></i>
+                    暂无历史记录
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">时间</th>
+                        <th style="width: 90px;">类型</th>
+                        <th>输入内容</th>
+                        <th>输出结果</th>
+                        <th style="width: 110px; text-align: right;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        historyData.forEach((item, index) => {
+            let badgeClass = 'encode';
+            let badgeText = '加密';
+            if (item.type === 'decode') {
+                badgeClass = 'decode';
+                badgeText = '解密';
+            } else if (item.type === 'auto_encode') {
+                badgeClass = 'auto';
+                badgeText = '智加';
+            } else if (item.type === 'auto_decode') {
+                badgeClass = 'auto';
+                badgeText = '智解';
+            }
+
+            const escapeHtml = (str) => {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            };
+
+            const escInput = escapeHtml(item.input);
+            const escOutput = escapeHtml(item.output);
+
+            html += `
+                <tr>
+                    <td><span style="color: var(--text-muted);">${item.time}</span></td>
+                    <td><span class="history-badge ${badgeClass}">${badgeText}</span></td>
+                    <td><div class="history-text-col" onclick="loadHistoryInput(${index})" title="点击填入输入框: ${escInput}">${escInput}</div></td>
+                    <td><div class="history-text-col" onclick="copyHistoryResult(${index})" title="点击复制此结果: ${escOutput}">${escOutput}</div></td>
+                    <td style="text-align: right;">
+                        <button class="history-action-btn" onclick="loadHistoryInput(${index})" title="载入此条记录">
+                            <i class="fa-solid fa-arrow-up"></i>
+                        </button>
+                        <button class="history-action-btn" onclick="copyHistoryResult(${index})" title="复制输出">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                        <button class="history-action-btn delete" onclick="deleteHistoryRecord(${index})" title="删除此条">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+        listWrapper.innerHTML = html;
+    }
+
+    // Global History interaction functions
+    window.loadHistoryInput = function(index) {
+        const item = historyData[index];
+        if (item) {
+            textInput.value = item.input;
+            textOutput.value = item.output;
+            charCount.textContent = `${item.input.length} 字符`;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '已载入历史';
+            codecStatus.style.color = 'var(--text-muted)';
+            
+            // Highlight target
+            textInput.focus();
+        }
+    };
+
+    window.copyHistoryResult = function(index) {
+        const item = historyData[index];
+        if (item && item.output) {
+            navigator.clipboard.writeText(item.output).then(() => {
+                codecStatus.textContent = '已复制历史输出';
+                codecStatus.style.color = 'var(--success)';
+                setTimeout(() => {
+                    codecStatus.textContent = '就绪';
+                    codecStatus.style.color = 'var(--text-muted)';
+                }, 1500);
+            });
+        }
+    };
+
+    window.deleteHistoryRecord = function(index) {
+        historyData.splice(index, 1);
+        saveHistory();
+    };
+
+    // Bind Clear History Button
+    document.getElementById('clear-history-btn').addEventListener('click', () => {
+        if (historyData.length === 0) return;
+        if (confirm('确定清空所有本地卦象加密/解密历史记录吗？')) {
+            historyData = [];
+            saveHistory();
+        }
+    });
+
+    // Count chars helper
+    textInput.addEventListener('input', () => {
+        charCount.textContent = `${textInput.value.length} 字符`;
+    });
+
+    // Unicode-safe Base64 encoding without padding
+    function base64Encode(str) {
+        return window.btoa(unescape(encodeURIComponent(str)))
+            .replace(/=+$/, ''); // 移除末尾填充 = 号
+    }
+
+    // Unicode-safe Base64 decoding
+    function base64Decode(str) {
+        // 自动补齐 Base64 填充等号
+        const padding = 4 - (str.length % 4);
+        if (padding !== 4) {
+            str += '='.repeat(padding);
+        }
+        return decodeURIComponent(escape(window.atob(str)));
+    }
+
+    // Encode to Hexagrams
+    function encodeHexagram(input) {
+        if (!input) return '';
+        const base64Str = base64Encode(input);
+        let result = '';
+        for (let i = 0; i < base64Str.length; i++) {
+            const char = base64Str.charAt(i);
+            if (ENCODE_MAP_TABLE[char]) {
+                result += ENCODE_MAP_TABLE[char];
+            } else {
+                result += char; 
+            }
+        }
+        return result;
+    }
+
+    // Decode from Hexagrams
+    function decodeHexagram(input) {
+        if (!input) return '';
+        let processedInput = input.replace(/\s/g, '').replace(/</g, '').replace(/>/g, '');
+        let base64Str = '';
+        for (let i = 0; i < processedInput.length; i++) {
+            const char = processedInput.charAt(i);
+            if (DECODE_MAP_TABLE[char]) {
+                base64Str += DECODE_MAP_TABLE[char];
+            } else {
+                throw new Error(`发现非卦象字符 "${char}"，无法进行解密`);
+            }
+        }
+        return base64Decode(base64Str);
+    }
+
+    // Check if input is likely hexagram ciphertext
+    function isCipherText(input) {
+        if (!input) return false;
+        const cleaned = input.replace(/\s/g, '');
+        if (cleaned.length === 0) return false;
+        
+        let cipherTextCount = 0;
+        for (let i = 0; i < cleaned.length; i++) {
+            if (DECODE_MAP_TABLE[cleaned.charAt(i)]) {
+                cipherTextCount++;
+            }
+        }
+        return cipherTextCount > cleaned.length * 0.5;
+    }
+
+    // Bind Action: Encode
+    encodeBtn.addEventListener('click', () => {
+        const val = textInput.value;
+        if (!val) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+        try {
+            const res = encodeHexagram(val);
+            textOutput.value = res;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '加密成功';
+            codecStatus.style.color = 'var(--success)';
+            
+            // Add history
+            addHistoryRecord('encode', val, res);
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 加密失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Bind Action: Decode
+    decodeBtn.addEventListener('click', () => {
+        const val = textInput.value.trim();
+        if (!val) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+        try {
+            const res = decodeHexagram(val);
+            textOutput.value = res;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '解密成功';
+            codecStatus.style.color = 'var(--success)';
+
+            // Add history
+            addHistoryRecord('decode', val, res);
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 解密失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Bind Action: Auto Codec
+    autoBtn.addEventListener('click', () => {
+        const val = textInput.value.trim();
+        if (!val) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+        try {
+            if (isCipherText(val)) {
+                const res = decodeHexagram(val);
+                textOutput.value = res;
+                codecStatus.textContent = '智能解密成功';
+                addHistoryRecord('auto_decode', val, res);
+            } else {
+                const res = encodeHexagram(textInput.value);
+                textOutput.value = res;
+                codecStatus.textContent = '智能加密成功';
+                addHistoryRecord('auto_encode', textInput.value, res);
+            }
+            errorBanner.style.display = 'none';
+            codecStatus.style.color = 'var(--success)';
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 智能转换失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Paste Action
+    pasteBtn.addEventListener('click', () => {
+        navigator.clipboard.readText()
+            .then(text => {
+                textInput.value = text;
+                charCount.textContent = `${text.length} 字符`;
+                errorBanner.style.display = 'none';
+                codecStatus.textContent = '已粘贴';
+                codecStatus.style.color = 'var(--text-muted)';
+            })
+            .catch(err => {
+                errorBanner.textContent = `❌ 粘贴失败: 无法访问剪贴板，请使用 Ctrl+V 或 Command+V 手动粘贴`;
+                errorBanner.style.display = 'block';
+            });
+    });
+
+    // Clear Action
+    clearBtn.addEventListener('click', () => {
+        textInput.value = '';
+        textOutput.value = '';
+        charCount.textContent = '0 字符';
+        errorBanner.style.display = 'none';
+        codecStatus.textContent = '就绪';
+        codecStatus.style.color = 'var(--text-muted)';
+    });
+
+    // Copy Action
+    copyBtn.addEventListener('click', () => {
+        const result = textOutput.value;
+        if (!result) return;
+        
+        navigator.clipboard.writeText(result).then(() => {
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> 已复制!';
+            copyBtn.style.borderColor = 'var(--success)';
+            copyBtn.style.color = 'var(--success)';
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+                copyBtn.style.borderColor = '';
+                copyBtn.style.color = '';
+            }, 1500);
+        });
+    });
+
+    // Initialize history on load
+    window.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+{% endblock %}
