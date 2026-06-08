@@ -129,3 +129,6 @@ app/static/uploads/*
 
 # Project summary document
 PROJECT_OVERVIEW.md
+
+# Game assets (local only, do not track in Git)
+game/
