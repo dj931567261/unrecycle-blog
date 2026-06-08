@@ -46,6 +46,9 @@
             <button class="admin-tab-btn" onclick="switchTab('bookmarks-tab', this)">
                 <i class="fa-solid fa-bookmark" style="margin-right: 6px;"></i> 灵感书签管理
             </button>
+            <button class="admin-tab-btn" onclick="switchTab('codes-tab', this)">
+                <i class="fa-solid fa-gift" style="margin-right: 6px;"></i> 游戏兑换码记录
+            </button>
         </div>
 
         <!-- TAB 1: POSTS -->
@@ -199,6 +202,54 @@
                         {% else %}
                             <tr>
                                 <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">暂无灵感书签，赶快添加吧！</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 4: REDEMPTION CODES -->
+        <div id="codes-tab" class="admin-tab-content">
+            <div class="action-row" style="margin-bottom: 20px;">
+                <button class="btn btn-danger" onclick="clearAllCodes()"><i class="fa-solid fa-trash-can"></i> 清空所有兑换码记录</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>兑换码</th>
+                            <th>来源游戏</th>
+                            <th>获取 IP 地址</th>
+                            <th>生成时间</th>
+                            <th>状态</th>
+                            <th style="text-align: right;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if redemption_codes %}
+                            {% for code in redemption_codes %}
+                                <tr id="code-row-{{ code.id }}">
+                                    <td style="font-family: var(--font-mono); font-weight: 700; font-size: 15px; color: var(--success);">{{ code.code }}</td>
+                                    <td style="font-weight: 600;">{{ code.game_title }}</td>
+                                    <td><code>{{ code.ip_address or 'unknown' }}</code></td>
+                                    <td>{{ code.created_at | datetime }}</td>
+                                    <td>
+                                        <span class="history-badge {% if code.status == 'unused' %}encode{% else %}decode{% endif %}" style="font-size: 11px;">
+                                            {% if code.status == 'unused' %}未使用{% else %}已核销{% endif %}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;" 
+                                                onclick="deleteCode({{ code.id }})">
+                                            <i class="fa-solid fa-trash"></i> 删除
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">暂无任何通关兑换码生成记录。</td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -785,6 +836,34 @@
                 document.getElementById(`bookmark-row-${bookmarkId}`).remove();
             } else {
                 alert('删除失败');
+            }
+        } catch (err) {
+            alert('网络异常');
+        }
+    }
+
+    async function deleteCode(codeId) {
+        if (!confirm('确定要删除这个兑换码记录吗？')) return;
+        try {
+            const response = await fetch(`/api/codes/${codeId}`, { method: 'DELETE' });
+            if (response.ok) {
+                document.getElementById(`code-row-${codeId}`).remove();
+            } else {
+                alert('删除失败');
+            }
+        } catch (err) {
+            alert('网络异常');
+        }
+    }
+
+    async function clearAllCodes() {
+        if (!confirm('确定要清空所有兑换码记录吗？此操作不可逆！')) return;
+        try {
+            const response = await fetch('/api/codes', { method: 'DELETE' });
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('清空失败');
             }
         } catch (err) {
             alert('网络异常');

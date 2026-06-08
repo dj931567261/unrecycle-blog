@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 class Post(Base):
@@ -36,3 +37,30 @@ class Bookmark(Base):
     description = Column(Text, nullable=True)
     tags = Column(String, default="")  # Comma-separated tags
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Game(Base):
+    __tablename__ = "games"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    slug = Column(String, unique=True, index=True, nullable=False)
+    description = Column(Text, nullable=True)
+    difficulty = Column(String, default="中等") # 简单, 中等, 困难
+    secret_hash = Column(String, nullable=True) # 谜题答案 SHA-256 哈希值
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    codes = relationship("RedemptionCode", back_populates="game", cascade="all, delete-orphan")
+
+class RedemptionCode(Base):
+    __tablename__ = "redemption_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String, default="unused") # unused, used
+    ip_address = Column(String, nullable=True)
+
+    game = relationship("Game", back_populates="codes")
+

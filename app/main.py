@@ -1,6 +1,7 @@
 import os
 import shutil
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Form, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -79,6 +80,32 @@ def seed_initial_data():
                 models.Bookmark(title="FastAPI - Official Documentation", url="https://fastapi.tiangolo.com", description="FastAPI standard doc site", tags="Backend,Python")
             ]
             db.add_all(bookmarks)
+            db.commit()
+
+        # Check and seed Games
+        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle"])).delete(synchronize_session=False)
+        db.commit()
+
+        if db.query(models.Game).filter(models.Game.slug.in_(["minesweeper", "sliding-puzzle"])).count() == 0:
+            games = [
+                models.Game(
+                    title="战损级 RPG 扫雷",
+                    slug="minesweeper",
+                    description="融合了 RPG 生命值与道具机制，以及心跳倒计时的定时雷扫雷挑战！避开地雷，解救危机，获取专属兑换码。",
+                    difficulty="困难",
+                    secret_hash=None,
+                    is_active=True
+                ),
+                models.Game(
+                    title="极客拼图滑块",
+                    slug="sliding-puzzle",
+                    description="经典数字华容道（8宫格拼图）。滑动滑块，将数字拼回顺序（1-8 + 空白格），通关即可得到兑换码。",
+                    difficulty="中等",
+                    secret_hash=None,
+                    is_active=True
+                )
+            ]
+            db.add_all(games)
             db.commit()
     finally:
         db.close()
@@ -216,6 +243,190 @@ async def render_tool(request: Request, tool_name: str, current_user: Optional[s
     except Exception:
         raise HTTPException(status_code=404, detail="Tool not found")
 
+# --- Game Center Routes ---
+import hmac
+import hashlib
+import json
+import base64
+import secrets
+
+GAME_SECRET_KEY = b"unrecycle_rpg_minesweeper_secret"
+
+def sign_game_state(data: dict) -> str:
+    json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
+    sig = hmac.new(GAME_SECRET_KEY, json_bytes, hashlib.sha256).hexdigest()
+    payload = {"data": data, "sig": sig}
+    return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
+
+def verify_game_state(payload_str: str) -> Optional[dict]:
+    try:
+        payload = json.loads(base64.b64decode(payload_str.encode("utf-8")).decode("utf-8"))
+        data = payload["data"]
+        sig = payload["sig"]
+        json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
+        expected_sig = hmac.new(GAME_SECRET_KEY, json_bytes, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(sig, expected_sig):
+            return data
+    except Exception:
+        pass
+    return None
+
+class GameVerifyPayload(BaseModel):
+    # Common
+    token: str
+    
+    # For Minesweeper
+    flags: Optional[List[List[int]]] = None
+    mistakes: Optional[int] = 0
+    
+    # For Sliding Puzzle
+    moves: Optional[List[str]] = None
+
+@app.get("/games", response_class=HTMLResponse)
+async def games_list_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+    games = crud.get_games(db, active_only=True)
+    return templates.TemplateResponse(request, "games_list.html", {
+        "games": games,
+        "is_admin": current_user is not None
+    })
+
+@app.get("/games/{game_slug}", response_class=HTMLResponse)
+async def game_detail_page(request: Request, game_slug: str, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+    game = crud.get_game_by_slug(db, game_slug)
+    if not game or not game.is_active:
+        raise HTTPException(status_code=404, detail="Game not found")
+    return templates.TemplateResponse(request, "game_detail.html", {
+        "game": game,
+        "is_admin": current_user is not None
+    })
+
+# API to Start / Scramble the game and return signed state
+@app.get("/api/games/{game_slug}/start")
+async def start_game(game_slug: str, db: Session = Depends(get_db)):
+    game = crud.get_game_by_slug(db, game_slug)
+    if not game or not game.is_active:
+        raise HTTPException(status_code=404, detail="Game not found")
+        
+    if game_slug == "minesweeper":
+        # Generate 10x10 board with 15 mines (12 regular, 3 bombs)
+        import random
+        all_cells = [(r, c) for r in range(10) for c in range(10)]
+        mine_cells = random.sample(all_cells, 15)
+        
+        # 3 time-bombs, 12 regular mines
+        bombs = mine_cells[:3]
+        mines = mine_cells[3:]
+        
+        state_data = {
+            "game": "minesweeper",
+            "bombs": bombs,
+            "mines": mines
+        }
+        token = sign_game_state(state_data)
+        
+        # We only return the Time-Bomb positions to the client (so it can flash them)
+        # We do NOT return regular mine positions (these are hidden in the token)
+        return {
+            "token": token,
+            "bombs": bombs
+        }
+        
+    elif game_slug == "sliding-puzzle":
+        # Generate solvable 3x3 board
+        # Solved board: [1, 2, 3, 4, 5, 6, 7, 8, 0]
+        # We make random swaps to scramble it
+        import random
+        b = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+        for _ in range(40):
+            idx = b.index(0)
+            valid_swaps = []
+            if idx >= 3: valid_swaps.append(idx - 3) # Up
+            if idx < 6: valid_swaps.append(idx + 3) # Down
+            if idx % 3 != 0: valid_swaps.append(idx - 1) # Left
+            if idx % 3 != 2: valid_swaps.append(idx + 1) # Right
+            swap_idx = random.choice(valid_swaps)
+            b[idx], b[swap_idx] = b[swap_idx], b[idx]
+            
+        state_data = {
+            "game": "sliding-puzzle",
+            "initial_board": b
+        }
+        token = sign_game_state(state_data)
+        return {
+            "token": token,
+            "board": b
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid game slug")
+
+@app.post("/api/games/{game_slug}/verify")
+async def verify_game(request: Request, game_slug: str, payload: GameVerifyPayload, db: Session = Depends(get_db)):
+    game = crud.get_game_by_slug(db, game_slug)
+    if not game or not game.is_active:
+        raise HTTPException(status_code=404, detail="Game not found")
+        
+    # Verify signature token
+    state_data = verify_game_state(payload.token)
+    if not state_data or state_data.get("game") != game_slug:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "failed", "error": "无效的游戏校验数据，请重新开始游戏！"}
+        )
+        
+    verified = False
+    
+    # 1. Minesweeper validation
+    if game_slug == "minesweeper":
+        if payload.flags is not None and payload.mistakes is not None:
+            # Check that mistakes are under 3
+            if payload.mistakes >= 3:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={"status": "failed", "error": "生命值已耗尽，挑战失败！"}
+                )
+            # Check that flags match mines exactly
+            # Mines are: bombs + mines
+            expected_mines = set((m[0], m[1]) for m in state_data["mines"]) | set((b[0], b[1]) for b in state_data["bombs"])
+            user_flags = set((f[0], f[1]) for f in payload.flags)
+            
+            # Since user might flag other safe spots, they must flag exactly the 15 mines
+            verified = (expected_mines == user_flags)
+            
+    # 2. Sliding Puzzle validation
+    elif game_slug == "sliding-puzzle":
+        if payload.moves is not None:
+            # Simulate moves on initial board
+            initial_board = state_data["initial_board"]
+            b = list(initial_board)
+            for m in payload.moves:
+                idx = b.index(0)
+                if m == "U" and idx >= 3:
+                    b[idx], b[idx - 3] = b[idx - 3], b[idx]
+                elif m == "D" and idx < 6:
+                    b[idx], b[idx + 3] = b[idx + 3], b[idx]
+                elif m == "L" and idx % 3 != 0:
+                    b[idx], b[idx - 1] = b[idx - 1], b[idx]
+                elif m == "R" and idx % 3 != 2:
+                    b[idx], b[idx + 1] = b[idx + 1], b[idx]
+            # Check if solved
+            verified = (b == [1, 2, 3, 4, 5, 6, 7, 8, 0])
+            
+    if not verified:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "failed", "error": "校验未通过，请确保答案正确并完成游戏！"}
+        )
+        
+    # Generate redemption code
+    code_str = f"UM-{game_slug.upper()[:3]}-{secrets.token_hex(4).upper()}"
+    client_ip = request.client.host if request.client else "unknown"
+    crud.create_redemption_code(db, code_str, game.id, client_ip)
+    
+    return {
+        "status": "success",
+        "code": code_str
+    }
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, current_user: Optional[str] = Depends(auth.get_current_user_optional)):
     if current_user:
@@ -250,6 +461,13 @@ async def admin_page(request: Request, db: Session = Depends(get_db), current_us
         nav_links_data = [model_to_dict(n) for n in nav_links]
         bookmarks_data = [model_to_dict(b) for b in bookmarks]
         
+        redemption_codes = crud.get_redemption_codes(db, limit=100)
+        codes_data = []
+        for rc in redemption_codes:
+            d = model_to_dict(rc)
+            d["game_title"] = rc.game.title if rc.game else "未知游戏"
+            codes_data.append(d)
+        
         # Get unique navigation categories with common defaults
         default_categories = ["常用网址", "技术文档", "开发工具", "设计资源"]
         existing_categories = [n.category for n in nav_links if n.category]
@@ -269,6 +487,7 @@ async def admin_page(request: Request, db: Session = Depends(get_db), current_us
             "posts": posts_data,
             "nav_links": nav_links_data,
             "bookmarks": bookmarks_data,
+            "redemption_codes": codes_data,
             "username": current_user,
             "nav_categories": nav_categories,
             "bookmark_tags": sorted_bookmark_tags
@@ -392,3 +611,18 @@ async def upload_file(file: UploadFile = File(...), current_user: str = Depends(
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
         
     return {"url": f"/static/uploads/{filename}"}
+
+
+# Redemption Code Admin APIs
+@app.delete("/api/codes/{code_id}")
+async def delete_redemption_code(code_id: int, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+    success = crud.delete_redemption_code(db, code_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Redemption code not found")
+    return {"message": "Redemption code deleted successfully"}
+
+@app.delete("/api/codes")
+async def clear_all_redemption_codes(db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+    crud.clear_all_redemption_codes(db)
+    return {"message": "All redemption codes cleared successfully"}
+

@@ -80,3 +80,45 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+# Game Schemas
+class GameBase(BaseModel):
+    title: str
+    slug: str
+    description: Optional[str] = None
+    difficulty: Optional[str] = "中等"
+    is_active: Optional[bool] = True
+
+class GameCreate(GameBase):
+    secret_hash: Optional[str] = None
+
+class GameUpdate(GameBase):
+    title: Optional[str] = None
+    slug: Optional[str] = None
+    secret_hash: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class GameInDB(GameBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# RedemptionCode Schemas
+class RedemptionCodeBase(BaseModel):
+    code: str
+    game_id: int
+    status: Optional[str] = "unused"
+    ip_address: Optional[str] = None
+
+class RedemptionCodeCreate(RedemptionCodeBase):
+    pass
+
+class RedemptionCodeInDB(RedemptionCodeBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+

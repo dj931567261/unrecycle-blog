@@ -1,0 +1,1285 @@
+{% extends "base.html" %}
+
+{% block title %}{{ game.title }} | 益智游戏中心{% endblock %}
+
+{% block content %}
+    <!-- Vanilla CSS for custom game layouts -->
+    <style>
+        /* Victory Modal styles */
+        .victory-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            z-index: 3000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .victory-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .victory-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--shadow-card-hover);
+            transform: scale(0.8);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .victory-backdrop.open .victory-card {
+            transform: scale(1);
+        }
+
+        .code-display-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px dashed var(--accent-blue);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 20px;
+            color: var(--success);
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        html[data-theme="light"] .code-display-box {
+            background: rgba(15, 23, 42, 0.04);
+        }
+
+        /* Toast notifications styling */
+        .game-toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 4000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .game-toast {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        html[data-theme="light"] .game-toast {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .game-toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* RPG Minesweeper styles */
+        .minesweeper-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--border-color);
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .minesweeper-board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 12px;
+            max-width: 440px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1;
+        }
+
+        .minesweeper-cell {
+            background: var(--bg-surface-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 16px;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            color: var(--text-primary);
+            position: relative;
+        }
+
+        .minesweeper-cell:hover {
+            background: var(--bg-input-focus);
+            transform: scale(1.05);
+        }
+
+        .minesweeper-cell.revealed {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            cursor: default;
+        }
+
+        html[data-theme="light"] .minesweeper-cell.revealed {
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .minesweeper-cell.flagged {
+            color: var(--error);
+            font-size: 16px;
+        }
+
+        .minesweeper-cell.defused {
+            color: var(--success);
+            font-size: 16px;
+        }
+
+        .minesweeper-cell.exploded {
+            background: rgba(239, 68, 68, 0.25) !important;
+            border-color: #ef4444 !important;
+            color: #ef4444 !important;
+            animation: shake 0.2s ease-in-out 2;
+        }
+
+        .minesweeper-cell.ticking {
+            animation: pulse-red 1s infinite alternate;
+            font-size: 11px;
+            color: #ef4444;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .minesweeper-cell.radar-highlight {
+            box-shadow: inset 0 0 8px var(--accent-blue);
+            border-color: var(--accent-blue) !important;
+            background: rgba(56, 189, 248, 0.15) !important;
+        }
+
+        /* Number Colors for Minesweeper */
+        .minesweeper-cell.num-1 { color: #38bdf8; } /* Light Blue */
+        .minesweeper-cell.num-2 { color: #4ade80; } /* Light Green */
+        .minesweeper-cell.num-3 { color: #f87171; } /* Red */
+        .minesweeper-cell.num-4 { color: #c084fc; } /* Purple */
+        .minesweeper-cell.num-5 { color: #fb7185; } /* Pink */
+        .minesweeper-cell.num-6 { color: #2dd4bf; } /* Teal */
+        .minesweeper-cell.num-7 { color: #fbbf24; } /* Amber */
+        .minesweeper-cell.num-8 { color: #94a3b8; } /* Slate */
+
+        @keyframes pulse-red {
+            from {
+                background: var(--bg-surface-solid);
+                box-shadow: 0 0 0px rgba(239, 68, 68, 0);
+            }
+            to {
+                background: rgba(239, 68, 68, 0.3);
+                box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.6);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
+        }
+
+        /* Sliding Puzzle styles */
+        .sliding-puzzle-wrapper {
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .sliding-puzzle-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.15);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .sliding-tile {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            background: var(--bg-surface-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-primary);
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+            transition: top 0.18s cubic-bezier(0.25, 1, 0.5, 1), left 0.18s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s, border-color 0.2s;
+        }
+
+        .sliding-tile:hover {
+            background: var(--bg-input-focus);
+            border-color: var(--accent-blue);
+        }
+
+        .sliding-tile.empty {
+            display: none;
+        }
+
+        .sliding-puzzle-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+    </style>
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/games" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+            <i class="fa-solid fa-arrow-left"></i> 返回游戏大厅
+        </a>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+            <h1 style="font-size: 26px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
+                {% if game.slug == 'minesweeper' %}💣{% else %}🧩{% endif %} {{ game.title }}
+            </h1>
+            <span class="history-badge {% if game.difficulty == '简单' %}encode{% elif game.difficulty == '中等' %}decode{% else %}auto{% endif %}">
+                {{ game.difficulty }}
+            </span>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 14px; margin-top: 6px;">{{ game.description }}</p>
+    </div>
+
+    <!-- Workspace -->
+    <div class="glass-card" style="padding: 24px; margin-bottom: 40px;">
+        {% if game.slug == 'minesweeper' %}
+            <!-- MINESWEEPER GAME AREA -->
+            <div class="minesweeper-header">
+                <div class="stat-item" id="ms-hp-container">
+                    <span>生命值:</span>
+                    <span id="ms-hp-hearts" style="letter-spacing: 2px;">💖 💖 💖</span>
+                </div>
+                <div class="stat-item" id="ms-shield-container">
+                    <span>护盾:</span>
+                    <span id="ms-shield-status" style="color: var(--text-muted);">🛡️ 0</span>
+                </div>
+                <div class="stat-item">
+                    <span>地雷旗帜:</span>
+                    <span id="ms-flag-count" style="color: var(--accent-blue); font-family: var(--font-mono);">🚩 0/15</span>
+                </div>
+                <div class="stat-item">
+                    <span id="ms-timer"><i class="fa-regular fa-clock"></i> 用时: 00:00</span>
+                </div>
+            </div>
+
+            <div class="minesweeper-board" id="ms-board">
+                <!-- Grid cells generated via Javascript -->
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap;">
+                <button id="ms-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
+                    <i class="fa-solid fa-rotate-left"></i> 重新开始
+                </button>
+                <button id="ms-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
+                </button>
+            </div>
+
+            <!-- RPG Rules Description Panel -->
+            <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <h4 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">🎮 战损级 RPG 玩法规则说明：</h4>
+                <ul style="font-size: 13px; color: var(--text-secondary); line-height: 1.8; padding-left: 20px;">
+                    <li><strong>生命值 💖</strong>：玩家初始拥有 3 点 HP。踩中普通地雷或定时雷爆炸会扣减 1 点 HP。HP 耗尽则游戏失败。</li>
+                    <li><strong>物品随机掉落 🎁</strong>：点击安全格子有 10% 概率爆出道具：
+                        <ul style="padding-left: 20px;">
+                            <li>🛡️ <strong>护盾</strong>（40%）：抵挡下一次任何地雷的爆炸伤害（最多持有 1 个）。</li>
+                            <li>❤️ <strong>生命水晶</strong>（30%）：回复 1 点 HP（最大 3 HP）。</li>
+                            <li>🔍 <strong>雷达扫描</strong>（30%）：瞬间感知并高亮显示该格子周围 3x3 范围内的所有地雷 3 秒。</li>
+                        </ul>
+                    </li>
+                    <li><strong>倒计时定时雷 ⏳</strong>：全图存在 3 颗定时炸弹。当玩家点击透露其相邻格子时，定时炸弹将被激活并开启 <strong>20秒脉冲倒计时</strong>！玩家必须在倒计时结束前通过 <strong>右键点击/长按</strong> 插旗将其拆除。若超时未拆除则会爆炸！</li>
+                </ul>
+            </div>
+
+        {% elif game.slug == 'sliding-puzzle' %}
+            <!-- SLIDING PUZZLE GAME AREA -->
+            <div class="sliding-puzzle-wrapper">
+                <div class="sliding-puzzle-info">
+                    <div>
+                        <span>步数:</span>
+                        <span id="sp-steps" style="color: var(--accent-blue); font-family: var(--font-mono);">0</span>
+                    </div>
+                    <div id="sp-timer">
+                        <i class="fa-regular fa-clock"></i> 用时: 00:00
+                    </div>
+                </div>
+
+                <div class="sliding-puzzle-container" id="sp-container">
+                    <!-- Absolute-positioned blocks generated via Javascript -->
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap;">
+                    <button id="sp-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
+                        <i class="fa-solid fa-rotate-left"></i> 重新打乱
+                    </button>
+                    <button id="sp-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
+                    </button>
+                </div>
+
+                <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: center;">
+                    <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                        <strong>玩法：</strong> 点击与空白格相邻的数字滑块，或使用键盘上的 <strong>方向键 (↑ ↓ ← →)</strong> 移动滑块。<br>
+                        当网格重新排列成 <strong>1 到 8</strong> 的顺序（最后右下角留空）时，即可成功通关并生成兑换码！
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+
+        <div id="game-error-banner" class="error-banner" style="margin-top: 20px; display: none;"></div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="game-toast-container"></div>
+
+    <!-- Victory Modal (Overlay) -->
+    <div id="victory-modal" class="victory-backdrop">
+        <div class="victory-card">
+            <div style="font-size: 64px; margin-bottom: 16px;">🎉</div>
+            <h2 style="font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">恭喜通关！</h2>
+            <p style="color: var(--text-secondary); font-size: 14px;">你已经成功完成了该游戏的脑力挑战，以下是你的通关专属兑换码：</p>
+            
+            <div class="code-display-box">
+                <span id="victory-code-text">UM-TEMP-123456</span>
+                <button id="copy-code-btn" class="btn-icon" title="复制兑换码" style="color: var(--accent-blue); padding: 4px; border: none; background: none; cursor: pointer;">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+            </div>
+
+            <div style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-top: 24px;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i> 兑换及使用指南：
+                </h4>
+                <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 20px; line-height: 1.8;">
+                    <li>1. 点击兑换码旁边的按钮一键复制该代码。</li>
+                    <li>2. 关注站长微信公众号 <strong>Unrecycle</strong> 或者添加站长个人微信号。</li>
+                    <li>3. 在微信后台发送此兑换码，系统将自动核销并为您发放神秘通关奖励（如专属纪念徽章或全栈学习礼包）！</li>
+                    <li><em>说明：每个兑换码在数据库中唯一绑定并记录，不可重复核销或伪造。</em></li>
+                </ul>
+            </div>
+
+            <button id="close-victory-btn" class="btn btn-primary" style="margin-top: 24px; width: 100%; padding: 10px 0;">
+                确定并返回大厅
+            </button>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // General Toast System
+    const toastContainer = document.getElementById('toast-container');
+    function showToast(message, icon = '🔔') {
+        const toast = document.createElement('div');
+        toast.className = 'game-toast';
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        toastContainer.appendChild(toast);
+        
+        // Trigger reflow
+        toast.offsetHeight;
+        toast.classList.add('show');
+        
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, 3000);
+    }
+
+    // General victory modal logic
+    const victoryModal = document.getElementById('victory-modal');
+    const victoryCodeText = document.getElementById('victory-code-text');
+    const copyCodeBtn = document.getElementById('copy-code-btn');
+    const closeVictoryBtn = document.getElementById('close-victory-btn');
+    const gameErrorBanner = document.getElementById('game-error-banner');
+
+    function showVictory(code) {
+        victoryCodeText.textContent = code;
+        victoryModal.classList.add('open');
+    }
+
+    closeVictoryBtn.addEventListener('click', () => {
+        window.location.href = '/games';
+    });
+
+    copyCodeBtn.addEventListener('click', () => {
+        const code = victoryCodeText.textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            const originalIcon = copyCodeBtn.innerHTML;
+            copyCodeBtn.innerHTML = '<i class="fa-solid fa-check" style="color: var(--success);"></i>';
+            setTimeout(() => {
+                copyCodeBtn.innerHTML = originalIcon;
+            }, 1500);
+        });
+    });
+
+    function showError(msg) {
+        if (msg) {
+            gameErrorBanner.textContent = msg;
+            gameErrorBanner.style.display = 'block';
+        } else {
+            gameErrorBanner.style.display = 'none';
+        }
+    }
+
+    // Game Specific Logics
+    const gameSlug = "{{ game.slug }}";
+
+    // ----------------------------------------
+    // 1. MINESWEEPER LOGIC
+    // ----------------------------------------
+    if (gameSlug === 'minesweeper') {
+        const boardEl = document.getElementById('ms-board');
+        const hpHeartsEl = document.getElementById('ms-hp-hearts');
+        const shieldEl = document.getElementById('ms-shield-status');
+        const flagCountEl = document.getElementById('ms-flag-count');
+        const timerEl = document.getElementById('ms-timer');
+        const resetBtn = document.getElementById('ms-reset-btn');
+        const testBtn = document.getElementById('ms-test-btn');
+
+        let board = [];
+        let mines = []; // List of coordinates, e.g., ["2,3", ...]
+        let bombs = []; // Time bomb coordinates
+        let gameToken = '';
+        
+        let hp = 3;
+        let shield = 0;
+        let mistakes = 0;
+        let timerInterval;
+        let timeElapsed = 0;
+        let gameOver = false;
+        let gameWon = false;
+
+        // Long press detection variables for mobile flag toggle
+        let touchTimer;
+        let isLongPress = false;
+
+        // Fetch initialization
+        function startGame() {
+            showError(null);
+            gameOver = false;
+            gameWon = false;
+            hp = 3;
+            shield = 0;
+            mistakes = 0;
+            timeElapsed = 0;
+            
+            // Clean active bomb timers if any
+            board.forEach(row => {
+                row.forEach(cell => {
+                    if (cell.tickInterval) {
+                        clearInterval(cell.tickInterval);
+                    }
+                });
+            });
+
+            // Update header UI
+            updateHeaderUI();
+            
+            // Fetch game data
+            fetch(`/api/games/minesweeper/start`)
+                .then(res => res.json())
+                .then(data => {
+                    gameToken = data.token;
+                    
+                    // Decode token to reveal mines for our local client logic (needed for count-up calculation etc.)
+                    // This is client-side validated securely via the signed token upon verify
+                    try {
+                        const payloadStr = atob(gameToken.split('.')[0] || gameToken);
+                        const payload = JSON.parse(payloadStr);
+                        mines = payload.data.mines.map(m => `${m[0]},${m[1]}`);
+                        bombs = payload.data.bombs.map(b => `${b[0]},${b[1]}`);
+                    } catch (e) {
+                        // Fallback in case token format is direct base64 encoded payload instead of JWT dot separated
+                        const payload = JSON.parse(atob(gameToken));
+                        mines = payload.data.mines.map(m => `${m[0]},${m[1]}`);
+                        bombs = payload.data.bombs.map(b => `${b[0]},${b[1]}`);
+                    }
+                    
+                    buildBoardGrid();
+                    startTimer();
+                })
+                .catch(err => {
+                    showError("无法从服务器启动扫雷游戏，请刷新页面重试！");
+                });
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeElapsed++;
+                const mins = String(Math.floor(timeElapsed / 60)).padStart(2, '0');
+                const secs = String(timeElapsed % 60).padStart(2, '0');
+                timerEl.innerHTML = `<i class="fa-regular fa-clock"></i> 用时: ${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function updateHeaderUI() {
+            // HP
+            let hearts = "";
+            for (let i = 1; i <= 3; i++) {
+                hearts += (i <= hp) ? "💖 " : "🤍 ";
+            }
+            hpHeartsEl.textContent = hearts.trim();
+
+            // Shield
+            shieldEl.innerHTML = shield > 0 ? `<span style="color: var(--success);">🛡️ 1</span>` : `🛡️ 0`;
+
+            // Flags
+            let flaggedCount = 0;
+            board.forEach(row => {
+                row.forEach(c => {
+                    if (c.isFlagged) flaggedCount++;
+                });
+            });
+            flagCountEl.textContent = `🚩 ${flaggedCount}/15`;
+        }
+
+        function buildBoardGrid() {
+            boardEl.innerHTML = '';
+            board = [];
+
+            for (let r = 0; r < 10; r++) {
+                const row = [];
+                for (let c = 0; c < 10; c++) {
+                    const coord = `${r},${c}`;
+                    const cellObj = {
+                        r: r,
+                        c: c,
+                        isMine: mines.includes(coord),
+                        isBomb: bombs.includes(coord),
+                        isRevealed: false,
+                        isFlagged: false,
+                        isTicking: false,
+                        tickTimer: 20,
+                        tickInterval: null,
+                        el: null
+                    };
+
+                    const cellEl = document.createElement('div');
+                    cellEl.className = 'minesweeper-cell';
+                    cellEl.dataset.r = r;
+                    cellEl.dataset.c = c;
+
+                    // Click Actions
+                    cellEl.addEventListener('click', (e) => {
+                        if (isLongPress) {
+                            isLongPress = false;
+                            return;
+                        }
+                        handleCellLeftClick(r, c);
+                    });
+
+                    // Flag Trigger on Right Click
+                    cellEl.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        handleCellRightClick(r, c);
+                    });
+
+                    // Mobile long-press touch interactions
+                    cellEl.addEventListener('touchstart', (e) => {
+                        isLongPress = false;
+                        touchTimer = setTimeout(() => {
+                            isLongPress = true;
+                            handleCellRightClick(r, c);
+                            showToast("标记标记点", "🚩");
+                        }, 500); // 500ms holds triggers flag
+                    });
+
+                    cellEl.addEventListener('touchend', (e) => {
+                        if (touchTimer) clearTimeout(touchTimer);
+                    });
+
+                    cellEl.addEventListener('touchmove', (e) => {
+                        if (touchTimer) clearTimeout(touchTimer);
+                    });
+
+                    cellObj.el = cellEl;
+                    boardEl.appendChild(cellEl);
+                    row.push(cellObj);
+                }
+                board.push(row);
+            }
+        }
+
+        function handleCellLeftClick(r, c) {
+            if (gameOver || gameWon) return;
+            const cell = board[r][c];
+            if (cell.isRevealed || cell.isFlagged) return;
+
+            // Trigger mine
+            if (cell.isMine || cell.isBomb) {
+                detonateCell(cell);
+                return;
+            }
+
+            // Safe Cell Clicked
+            revealCell(r, c);
+            
+            // Item drop check (10% chance)
+            if (Math.random() < 0.10) {
+                rollItemDrop(r, c);
+            }
+
+            checkMinesweeperGameStatus();
+        }
+
+        function handleCellRightClick(r, c) {
+            if (gameOver || gameWon) return;
+            const cell = board[r][c];
+            if (cell.isRevealed) return;
+
+            if (cell.isFlagged) {
+                cell.isFlagged = false;
+                cell.el.classList.remove('flagged');
+                cell.el.textContent = '';
+                
+                // If it is a ticking bomb, does it resume ticking?
+                // For a friendly gameplay experience, we keep it defused once flagged,
+                // but let's re-apply ticking class if it is a bomb and adjacent was revealed.
+                if (cell.isBomb && cell.isTicking && cell.tickTimer > 0) {
+                    cell.el.classList.add('ticking');
+                    cell.el.textContent = `💣 ${cell.tickTimer}s`;
+                    startBombTicking(cell);
+                }
+            } else {
+                // Count current flags
+                let flags = 0;
+                board.forEach(row => row.forEach(c => { if (c.isFlagged) flags++; }));
+                if (flags >= 15) {
+                    showToast("已放置最大旗帜数量 (15)！", "⚠️");
+                    return;
+                }
+
+                cell.isFlagged = true;
+                cell.el.classList.add('flagged');
+                
+                if (cell.isBomb && cell.tickInterval) {
+                    // Defused! Stop interval
+                    clearInterval(cell.tickInterval);
+                    cell.tickInterval = null;
+                    cell.el.classList.remove('ticking');
+                    cell.el.classList.add('defused');
+                    cell.el.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i>`;
+                    showToast("定时雷成功拆除！", "🟢");
+                } else {
+                    cell.el.innerHTML = `<i class="fa-solid fa-flag"></i>`;
+                }
+            }
+
+            updateHeaderUI();
+            checkMinesweeperGameStatus();
+        }
+
+        function revealCell(r, c) {
+            const cell = board[r][c];
+            if (cell.isRevealed) return;
+
+            cell.isRevealed = true;
+            cell.el.classList.add('revealed');
+            
+            const count = countAdjacentMines(r, c);
+            if (count > 0) {
+                cell.el.textContent = count;
+                cell.el.classList.add(`num-${count}`);
+            } else {
+                cell.el.textContent = '';
+                // Flood Fill
+                const neighbors = getNeighbors(r, c);
+                neighbors.forEach(n => {
+                    const nc = board[n[0]][n[1]];
+                    if (!nc.isMine && !nc.isBomb && !nc.isRevealed && !nc.isFlagged) {
+                        revealCell(n[0], n[1]);
+                    }
+                });
+            }
+
+            // Trigger ticking on adjacent bombs
+            const neighbors = getNeighbors(r, c);
+            neighbors.forEach(n => {
+                const neighborCell = board[n[0]][n[1]];
+                if (neighborCell.isBomb && !neighborCell.isRevealed && !neighborCell.isFlagged && !neighborCell.tickInterval) {
+                    neighborCell.isTicking = true;
+                    neighborCell.el.classList.add('ticking');
+                    neighborCell.el.textContent = `💣 ${neighborCell.tickTimer}s`;
+                    startBombTicking(neighborCell);
+                    showToast("警告：检测到相邻定时炸弹，开始倒计时！", "⏳");
+                }
+            });
+        }
+
+        function startBombTicking(cell) {
+            if (cell.tickInterval) clearInterval(cell.tickInterval);
+            cell.tickInterval = setInterval(() => {
+                cell.tickTimer--;
+                if (cell.tickTimer <= 0) {
+                    clearInterval(cell.tickInterval);
+                    cell.tickInterval = null;
+                    detonateCell(cell);
+                } else {
+                    cell.el.textContent = `💣 ${cell.tickTimer}s`;
+                }
+            }, 1000);
+        }
+
+        function detonateCell(cell) {
+            if (cell.tickInterval) {
+                clearInterval(cell.tickInterval);
+                cell.tickInterval = null;
+            }
+            cell.isRevealed = true;
+            cell.el.classList.remove('ticking', 'flagged');
+            cell.el.classList.add('exploded');
+            cell.el.innerHTML = `<i class="fa-solid fa-bomb"></i>`;
+            
+            // Damage check
+            if (shield > 0) {
+                shield = 0;
+                showToast("🛡️ 护盾抵挡了爆炸伤害！", "🛡️");
+            } else {
+                hp--;
+                mistakes++;
+                showToast("💥 炸弹爆炸！生命值 -1", "💥");
+                if (hp <= 0) {
+                    triggerMinesweeperGameOver(false);
+                }
+            }
+            updateHeaderUI();
+            checkMinesweeperGameStatus();
+        }
+
+        function countAdjacentMines(r, c) {
+            let count = 0;
+            const neighbors = getNeighbors(r, c);
+            neighbors.forEach(n => {
+                const nc = board[n[0]][n[1]];
+                if (nc.isMine || nc.isBomb) count++;
+            });
+            return count;
+        }
+
+        function getNeighbors(r, c) {
+            const neighbors = [];
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = r + dr;
+                    const nc = c + dc;
+                    if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10) {
+                        neighbors.push([nr, nc]);
+                    }
+                }
+            }
+            return neighbors;
+        }
+
+        function rollItemDrop(r, c) {
+            const roll = Math.random();
+            if (roll < 0.40) {
+                // Shield 🛡️
+                if (shield < 1) {
+                    shield = 1;
+                    showToast("获得宝箱：🛡️ 战能护盾已装备！", "🛡️");
+                } else {
+                    showToast("获得宝箱：已经拥有护盾，无法重复装备。", "🛡️");
+                }
+            } else if (roll < 0.70) {
+                // Heart ❤️
+                if (hp < 3) {
+                    hp++;
+                    showToast("获得宝箱：❤️ 生命值恢复 +1！", "❤️");
+                } else {
+                    showToast("获得宝箱：生命已满，无法继续回复。", "❤️");
+                }
+            } else {
+                // Radar 🔍
+                showToast("获得宝箱：🔍 探测雷达扫描中...", "🔍");
+                const neighbors = getNeighbors(r, c);
+                // Highlight mines temporarily
+                neighbors.forEach(n => {
+                    const nc = board[n[0]][n[1]];
+                    if ((nc.isMine || nc.isBomb) && !nc.isRevealed) {
+                        nc.el.classList.add('radar-highlight');
+                        setTimeout(() => {
+                            nc.el.classList.remove('radar-highlight');
+                        }, 3000);
+                    }
+                });
+            }
+            updateHeaderUI();
+        }
+
+        function checkMinesweeperGameStatus() {
+            if (gameOver || gameWon) return;
+
+            // Condition 1: Check if all non-mine cells are revealed
+            let allSafeRevealed = true;
+            let correctFlagsCount = 0;
+            let wrongFlagsCount = 0;
+            let flaggedMines = [];
+
+            board.forEach(row => {
+                row.forEach(c => {
+                    if (!c.isMine && !c.isBomb) {
+                        if (!c.isRevealed) allSafeRevealed = false;
+                        if (c.isFlagged) wrongFlagsCount++;
+                    } else {
+                        if (c.isFlagged || c.isRevealed) {
+                            correctFlagsCount++;
+                            flaggedMines.push([c.r, c.c]);
+                        }
+                    }
+                });
+            });
+
+            // If we solved all safe cells OR all 15 mines are identified and mistakes are safe
+            if ((allSafeRevealed || correctFlagsCount === 15) && wrongFlagsCount === 0 && hp > 0) {
+                // Collect exact flagged and exploded coordinates to submit
+                const finalFlags = [];
+                board.forEach(row => {
+                    row.forEach(c => {
+                        if (c.isMine || c.isBomb) {
+                            finalFlags.push([c.r, c.c]);
+                        }
+                    });
+                });
+                triggerMinesweeperVictory(finalFlags);
+            }
+        }
+
+        function triggerMinesweeperVictory(finalFlags) {
+            gameWon = true;
+            clearInterval(timerInterval);
+            
+            // Call verify API
+            fetch(`/api/games/minesweeper/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    token: gameToken,
+                    flags: finalFlags,
+                    mistakes: mistakes
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (response.ok) {
+                    showVictory(data.code);
+                } else {
+                    showError("❌ " + (data.error || "校验失败，请重新尝试！"));
+                }
+            })
+            .catch(err => {
+                showError("❌ 校验服务发生错误，请重试！");
+            });
+        }
+
+        function triggerMinesweeperGameOver(success = false) {
+            gameOver = true;
+            clearInterval(timerInterval);
+            
+            // Clear ticking intervals
+            board.forEach(row => {
+                row.forEach(c => {
+                    if (c.tickInterval) clearInterval(c.tickInterval);
+                });
+            });
+
+            if (!success) {
+                showToast("💀 挑战失败！生命值已耗尽。", "💀");
+                showError("💀 生命值已耗尽！请点击「重新开始」进行新一轮挑战。");
+                // Reveal all mines on board
+                board.forEach(row => {
+                    row.forEach(c => {
+                        if (c.isMine || c.isBomb) {
+                            c.el.classList.add('revealed');
+                            if (c.isBomb) {
+                                c.el.classList.add('exploded');
+                                c.el.innerHTML = `<i class="fa-solid fa-bomb"></i>`;
+                            } else {
+                                c.el.innerHTML = `<i class="fa-solid fa-bomb" style="opacity: 0.6;"></i>`;
+                            }
+                        }
+                    });
+                });
+            }
+        }
+
+        // Developer Debug Bypass
+        testBtn.addEventListener('click', () => {
+            if (gameOver || gameWon) return;
+            showToast("🔮 启动开发者破解模式，瞬间拆除所有地雷！", "🔮");
+            const finalFlags = [];
+            board.forEach(row => {
+                row.forEach(c => {
+                    if (c.isMine || c.isBomb) {
+                        c.isFlagged = true;
+                        c.el.classList.add('flagged');
+                        if (c.isBomb) c.el.classList.add('defused');
+                        c.el.innerHTML = `<i class="fa-solid fa-flag"></i>`;
+                        finalFlags.push([c.r, c.c]);
+                    }
+                });
+            });
+            updateHeaderUI();
+            triggerMinesweeperVictory(finalFlags);
+        });
+
+        resetBtn.addEventListener('click', startGame);
+
+        // Run
+        startGame();
+
+    // ----------------------------------------
+    // 2. SLIDING PUZZLE LOGIC
+    // ----------------------------------------
+    } else if (gameSlug === 'sliding-puzzle') {
+        const container = document.getElementById('sp-container');
+        const stepsEl = document.getElementById('sp-steps');
+        const timerEl = document.getElementById('sp-timer');
+        const resetBtn = document.getElementById('sp-reset-btn');
+        const testBtn = document.getElementById('sp-test-btn');
+
+        let b = [];
+        let movesList = [];
+        let gameToken = '';
+        
+        let steps = 0;
+        let timerInterval;
+        let timeElapsed = 0;
+        let gameOver = false;
+        let gameWon = false;
+        const tilesMap = {};
+
+        function startPuzzle() {
+            showError(null);
+            gameOver = false;
+            gameWon = false;
+            steps = 0;
+            timeElapsed = 0;
+            movesList = [];
+            stepsEl.textContent = '0';
+            
+            fetch(`/api/games/sliding-puzzle/start`)
+                .then(res => res.json())
+                .then(data => {
+                    gameToken = data.token;
+                    b = data.board;
+                    
+                    initPuzzleGrid();
+                    startTimer();
+                })
+                .catch(err => {
+                    showError("无法从服务器启动拼图游戏，请刷新页面重试！");
+                });
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeElapsed++;
+                const mins = String(Math.floor(timeElapsed / 60)).padStart(2, '0');
+                const secs = String(timeElapsed % 60).padStart(2, '0');
+                timerEl.innerHTML = `<i class="fa-regular fa-clock"></i> 用时: ${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function initPuzzleGrid() {
+            container.innerHTML = '';
+            for (let val = 1; val <= 8; val++) {
+                const tile = document.createElement('div');
+                tile.className = 'sliding-tile';
+                tile.textContent = val;
+                
+                tile.addEventListener('click', () => {
+                    if (gameOver || gameWon) return;
+                    const currentIdx = b.indexOf(val);
+                    handleTileClick(currentIdx);
+                });
+                
+                container.appendChild(tile);
+                tilesMap[val] = tile;
+            }
+            updatePuzzleUI();
+        }
+
+        function updatePuzzleUI() {
+            for (let i = 0; i < 9; i++) {
+                const val = b[i];
+                if (val === 0) continue;
+                const tile = tilesMap[val];
+                const row = Math.floor(i / 3);
+                const col = i % 3;
+                tile.style.left = (col * 100 + 5) + 'px';
+                tile.style.top = (row * 100 + 5) + 'px';
+            }
+        }
+
+        function handleTileClick(idx) {
+            const zeroIdx = b.indexOf(0);
+            const moves = getValidMoves(zeroIdx);
+            const move = moves.find(m => m.nextIdx === idx);
+            if (move) {
+                // Swap values
+                b[zeroIdx] = b[idx];
+                b[idx] = 0;
+                
+                steps++;
+                stepsEl.textContent = steps;
+                movesList.push(move.dir);
+                
+                updatePuzzleUI();
+                checkPuzzleSolved();
+            }
+        }
+
+        function getValidMoves(zeroIdx) {
+            const moves = [];
+            if (zeroIdx >= 3) moves.push({ dir: "U", nextIdx: zeroIdx - 3 });
+            if (zeroIdx < 6) moves.push({ dir: "D", nextIdx: zeroIdx + 3 });
+            if (zeroIdx % 3 !== 0) moves.push({ dir: "L", nextIdx: zeroIdx - 1 });
+            if (zeroIdx % 3 !== 2) moves.push({ dir: "R", nextIdx: zeroIdx + 1 });
+            return moves;
+        }
+
+        function checkPuzzleSolved() {
+            const target = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+            const solved = b.every((val, index) => val === target[index]);
+            if (solved) {
+                gameWon = true;
+                clearInterval(timerInterval);
+                
+                // Submit verifying moves sequence to backend
+                fetch(`/api/games/sliding-puzzle/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: gameToken,
+                        moves: movesList
+                    })
+                })
+                .then(async response => {
+                    const data = await response.json();
+                    if (response.ok) {
+                        showVictory(data.code);
+                    } else {
+                        showError("❌ " + (data.error || "校验失败！"));
+                    }
+                })
+                .catch(err => {
+                    showError("❌ 校验服务出错，请重试！");
+                });
+            }
+        }
+
+        // Keyboard navigation
+        window.addEventListener('keydown', (e) => {
+            if (gameSlug !== 'sliding-puzzle') return;
+            if (gameOver || gameWon) return;
+            
+            const zeroIdx = b.indexOf(0);
+            let targetIdx = -1;
+            let dir = "";
+            
+            if (e.key === 'ArrowUp') {
+                // Empty slot moves down (D)
+                if (zeroIdx < 6) {
+                    targetIdx = zeroIdx + 3;
+                    dir = "D";
+                }
+            } else if (e.key === 'ArrowDown') {
+                // Empty slot moves up (U)
+                if (zeroIdx >= 3) {
+                    targetIdx = zeroIdx - 3;
+                    dir = "U";
+                }
+            } else if (e.key === 'ArrowLeft') {
+                // Empty slot moves right (R)
+                if (zeroIdx % 3 !== 2) {
+                    targetIdx = zeroIdx + 1;
+                    dir = "R";
+                }
+            } else if (e.key === 'ArrowRight') {
+                // Empty slot moves left (L)
+                if (zeroIdx % 3 !== 0) {
+                    targetIdx = zeroIdx - 1;
+                    dir = "L";
+                }
+            }
+            
+            if (targetIdx !== -1) {
+                b[zeroIdx] = b[targetIdx];
+                b[targetIdx] = 0;
+                
+                steps++;
+                stepsEl.textContent = steps;
+                movesList.push(dir);
+                
+                updatePuzzleUI();
+                checkPuzzleSolved();
+                e.preventDefault(); // prevent scrolling
+            }
+        });
+
+        // 8-Puzzle BFS Solver for Debug
+        function solve8Puzzle(startBoard) {
+            const target = "1,2,3,4,5,6,7,8,0";
+            const startStr = startBoard.join(",");
+            if (startStr === target) return [];
+            
+            const queue = [{ board: startBoard, path: [] }];
+            const visited = new Set();
+            visited.add(startStr);
+            
+            let limit = 40000;
+            while (queue.length > 0 && limit-- > 0) {
+                const current = queue.shift();
+                const board = current.board;
+                const path = current.path;
+                
+                const idx = board.indexOf(0);
+                const nextMoves = [];
+                if (idx >= 3) nextMoves.push({ dir: "U", nextIdx: idx - 3 });
+                if (idx < 6) nextMoves.push({ dir: "D", nextIdx: idx + 3 });
+                if (idx % 3 !== 0) nextMoves.push({ dir: "L", nextIdx: idx - 1 });
+                if (idx % 3 !== 2) nextMoves.push({ dir: "R", nextIdx: idx + 1 });
+                
+                for (const m of nextMoves) {
+                    const nextBoard = [...board];
+                    nextBoard[idx] = nextBoard[m.nextIdx];
+                    nextBoard[m.nextIdx] = 0;
+                    
+                    const nextStr = nextBoard.join(",");
+                    const nextPath = [...path, m.dir];
+                    
+                    if (nextStr === target) {
+                        return nextPath;
+                    }
+                    
+                    if (!visited.has(nextStr)) {
+                        visited.add(nextStr);
+                        queue.push({ board: nextBoard, path: nextPath });
+                    }
+                }
+            }
+            return null;
+        }
+
+        testBtn.addEventListener('click', () => {
+            if (gameOver || gameWon) return;
+            showToast("🔮 计算拼图还原路径中...", "🔮");
+            const startBoard = [...b];
+            const path = solve8Puzzle(startBoard);
+            if (!path) {
+                showToast("未找到可解路径，请重置！", "❌");
+                return;
+            }
+            
+            showToast(`找到还原路径，共 ${path.length} 步，正在自动通关...`, "🔮");
+            
+            // Swap board elements instantly to target sorted
+            b = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+            updatePuzzleUI();
+            
+            // Submit solving moves to backend
+            fetch(`/api/games/sliding-puzzle/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    token: gameToken,
+                    moves: path
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (response.ok) {
+                    showVictory(data.code);
+                } else {
+                    showError("❌ " + (data.error || "校验失败！"));
+                }
+            })
+            .catch(err => {
+                showError("❌ 校验服务发生错误！");
+            });
+        });
+
+        resetBtn.addEventListener('click', startPuzzle);
+
+        // Run
+        startPuzzle();
+    }
+</script>
+{% endblock %}

@@ -122,3 +122,57 @@ def delete_bookmark(db: Session, bookmark_id: int):
         db.commit()
         return True
     return False
+
+# Game CRUD operations
+def get_game_by_slug(db: Session, slug: str):
+    return db.query(models.Game).filter(models.Game.slug == slug).first()
+
+def get_games(db: Session, active_only: bool = True):
+    query = db.query(models.Game)
+    if active_only:
+        query = query.filter(models.Game.is_active == True)
+    return query.order_by(models.Game.created_at.desc()).all()
+
+def create_game(db: Session, game: schemas.GameCreate):
+    db_game = models.Game(
+        title=game.title,
+        slug=game.slug,
+        description=game.description,
+        difficulty=game.difficulty,
+        secret_hash=game.secret_hash,
+        is_active=game.is_active
+    )
+    db.add(db_game)
+    db.commit()
+    db.refresh(db_game)
+    return db_game
+
+# RedemptionCode CRUD operations
+def get_redemption_codes(db: Session, limit: int = 100):
+    return db.query(models.RedemptionCode).order_by(models.RedemptionCode.created_at.desc()).limit(limit).all()
+
+def create_redemption_code(db: Session, code: str, game_id: int, ip_address: str = None):
+    db_code = models.RedemptionCode(
+        code=code,
+        game_id=game_id,
+        ip_address=ip_address,
+        status="unused"
+    )
+    db.add(db_code)
+    db.commit()
+    db.refresh(db_code)
+    return db_code
+
+def delete_redemption_code(db: Session, code_id: int):
+    db_code = db.query(models.RedemptionCode).filter(models.RedemptionCode.id == code_id).first()
+    if db_code:
+        db.delete(db_code)
+        db.commit()
+        return True
+    return False
+
+def clear_all_redemption_codes(db: Session):
+    db.query(models.RedemptionCode).delete()
+    db.commit()
+    return True
+

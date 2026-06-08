@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}益智游戏中心 | Unrecycle-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-bottom: 40px; margin-top: 20px;">
+        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">🎮 益智游戏大厅</h1>
+        <p style="color: var(--text-secondary); max-width: 600px;">这里收集了一些烧脑的益智开发小游戏。成功通关不仅能证明你的脑力，更能获得专属的**兑换码奖励**！</p>
+    </div>
+
+    <!-- Games grid -->
+    <div class="tools-grid">
+        {% for game in games %}
+            <div class="glass-card tool-card" style="display: flex; flex-direction: column; height: 100%;">
+                <div class="tool-card-icon" style="font-size: 36px; margin-bottom: 16px;">
+                    {% if game.slug == 'minesweeper' %}
+                        💣
+                    {% elif game.slug == 'sliding-puzzle' %}
+                        🧩
+                    {% else %}
+                        🎯
+                    {% endif %}
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <h3 class="tool-card-title" style="margin: 0; font-size: 20px;">{{ game.title }}</h3>
+                    <span class="history-badge {% if game.difficulty == '简单' %}encode{% elif game.difficulty == '中等' %}decode{% else %}auto{% endif %}">
+                        {{ game.difficulty }}
+                    </span>
+                </div>
+                <p class="tool-card-desc" style="margin-bottom: 24px; flex-grow: 1;">{{ game.description }}</p>
+                <a href="/games/{{ game.slug }}" class="btn btn-primary" style="text-align: center; width: 100%; padding: 10px 0; font-weight: 600; text-decoration: none; display: block; border-radius: 8px;">
+                    开始挑战 <i class="fa-solid fa-play" style="margin-left: 6px;"></i>
+                </a>
+            </div>
+        {% else %}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 48px; color: var(--text-muted);">
+                <i class="fa-solid fa-gamepad" style="font-size: 48px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
+                暂无正在开放的游戏，敬请期待...
+            </div>
+        {% endfor %}
+    </div>
+
+{% endblock %}
