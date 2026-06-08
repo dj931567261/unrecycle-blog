@@ -353,7 +353,7 @@
                             <li>🔍 <strong>雷达扫描</strong>（30%）：瞬间感知并高亮显示该格子周围 3x3 范围内的所有地雷 3 秒。</li>
                         </ul>
                     </li>
-                    <li><strong>倒计时定时雷 ⏳</strong>：全图存在 3 颗定时炸弹。当玩家点击透露其相邻格子时，定时炸弹将被激活并开启 <strong>20秒脉冲倒计时</strong>！玩家必须在倒计时结束前通过 <strong>右键点击/长按</strong> 插旗将其拆除。若超时未拆除则会爆炸！</li>
+                    <li><strong>倒计时定时雷 ⏳</strong>：全图存在 3 颗定时炸弹。当玩家点击透露其相邻格子时，定时炸弹将被激活并开启 <strong>20秒脉冲倒计时</strong>！玩家必须在倒计时结束前<strong>点击任意一个非地雷的安全格子</strong>来拆除该定时雷。若超时未点击安全格子，它将会爆炸！</li>
                 </ul>
             </div>
 
@@ -680,7 +680,25 @@
                 return;
             }
 
-            // Safe Cell Clicked
+            // Safe Cell Clicked: Defuse all currently ticking bombs
+            let defusedAny = false;
+            board.forEach(row => {
+                row.forEach(bCell => {
+                    if (bCell.isBomb && bCell.tickInterval) {
+                        clearInterval(bCell.tickInterval);
+                        bCell.tickInterval = null;
+                        bCell.el.classList.remove('ticking');
+                        bCell.el.classList.add('defused');
+                        bCell.isFlagged = true;
+                        bCell.el.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i>`;
+                        defusedAny = true;
+                    }
+                });
+            });
+            if (defusedAny) {
+                showToast("点击安全格子，成功拆除定时雷！", "🟢");
+            }
+
             revealCell(r, c);
             
             // Item drop check (10% chance)
@@ -688,6 +706,7 @@
                 rollItemDrop(r, c);
             }
 
+            updateHeaderUI();
             checkMinesweeperGameStatus();
         }
 
@@ -695,20 +714,15 @@
             if (gameOver || gameWon) return;
             const cell = board[r][c];
             if (cell.isRevealed) return;
+            if (cell.isTicking && cell.tickInterval) {
+                showToast("定时雷无法直接拆除！请尽快点击任意一个安全格子！", "⏳");
+                return;
+            }
 
             if (cell.isFlagged) {
                 cell.isFlagged = false;
                 cell.el.classList.remove('flagged');
                 cell.el.textContent = '';
-                
-                // If it is a ticking bomb, does it resume ticking?
-                // For a friendly gameplay experience, we keep it defused once flagged,
-                // but let's re-apply ticking class if it is a bomb and adjacent was revealed.
-                if (cell.isBomb && cell.isTicking && cell.tickTimer > 0) {
-                    cell.el.classList.add('ticking');
-                    cell.el.textContent = `💣 ${cell.tickTimer}s`;
-                    startBombTicking(cell);
-                }
             } else {
                 // Count current flags
                 let flags = 0;
@@ -720,18 +734,7 @@
 
                 cell.isFlagged = true;
                 cell.el.classList.add('flagged');
-                
-                if (cell.isBomb && cell.tickInterval) {
-                    // Defused! Stop interval
-                    clearInterval(cell.tickInterval);
-                    cell.tickInterval = null;
-                    cell.el.classList.remove('ticking');
-                    cell.el.classList.add('defused');
-                    cell.el.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--success);"></i>`;
-                    showToast("定时雷成功拆除！", "🟢");
-                } else {
-                    cell.el.innerHTML = `<i class="fa-solid fa-flag"></i>`;
-                }
+                cell.el.innerHTML = `<i class="fa-solid fa-flag"></i>`;
             }
 
             updateHeaderUI();
