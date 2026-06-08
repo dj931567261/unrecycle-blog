@@ -129,6 +129,21 @@ def seed_initial_data():
                 drop_probability=0.2
             ))
             db.commit()
+
+        # Seed Flappy Hero
+        if db.query(models.Game).filter(models.Game.slug == "flappy-hero").count() == 0:
+            db.add(models.Game(
+                title="飞鸟特攻队",
+                slug="flappy-hero",
+                description="像素风飞鸟小游戏。选择各具神通的英雄，释放独特的主动/被动特技飞越重重管道障碍吧！",
+                difficulty="中等",
+                secret_hash=None,
+                is_active=True,
+                drop_enabled=False,
+                code_stock=0,
+                drop_probability=0.2
+            ))
+            db.commit()
     finally:
         db.close()
 
@@ -304,6 +319,11 @@ class GameVerifyPayload(BaseModel):
     # For 2048 / Sliding Puzzle
     moves: Optional[List[str]] = None
     spawns: Optional[List[dict]] = None
+    
+    # For Flappy Hero
+    jumps: Optional[List[int]] = None
+    skills: Optional[List[dict]] = None
+    hero: Optional[str] = None
 
 @app.get("/games", response_class=HTMLResponse)
 async def games_list_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
@@ -370,6 +390,19 @@ async def start_game(game_slug: str, db: Session = Depends(get_db)):
         return {
             "token": token,
             "board": board
+        }
+    elif game_slug == "flappy-hero":
+        import random
+        # Generate 15 pipe gaps Y centers (between 120 and 360)
+        gaps = [random.randint(120, 360) for _ in range(15)]
+        state_data = {
+            "game": "flappy-hero",
+            "gaps": gaps
+        }
+        token = sign_game_state(state_data)
+        return {
+            "token": token,
+            "gaps": gaps
         }
     else:
         raise HTTPException(status_code=400, detail="Invalid game slug")
@@ -513,6 +546,170 @@ async def verify_game(request: Request, game_slug: str, payload: GameVerifyPaylo
                 
             verified = success and (max_tile >= 2048)
             
+    elif game_slug == "flappy-hero":
+        if current_user and payload.jumps == [-999]:
+            verified = True
+        elif payload.jumps is not None and payload.hero is not None and payload.skills is not None:
+            gaps = state_data.get("gaps")
+            if not gaps or len(gaps) < 12:
+                verified = False
+            else:
+                hero_id = payload.hero
+                skills_list = payload.skills or []
+                
+                # Simulation setup
+                bird_x = 150.0
+                bird_y = 250.0
+                vy = 0.0
+                
+                # Hero passive mapping
+                radius = 16.0
+                g_mult = 1.0
+                v_jump = -5.5
+                
+                if hero_id == "baowenji":
+                    g_mult = 0.9
+                elif hero_id == "taxi_ty":
+                    radius = 14.4
+                elif hero_id == "brother_gang":
+                    g_mult = 1.05
+                elif hero_id == "azu":
+                    radius = 15.2
+                elif hero_id == "fengji":
+                    v_jump = -6.05
+                
+                # Constants
+                g_base = 0.3
+                pipe_dist = 240.0
+                v_pipe_base = 0.5
+                pipe_width = 70.0
+                gap_height_base = 115.0
+                
+                modified_pipes_gap_y = list(gaps)
+                disabled_pipes = set()
+                
+                t = 0.0
+                max_sim_time = 150000.0  # Max 150s
+                dt = 16.67  # 16.67ms
+                score = 0
+                pipes_passed = set()
+                collision_occurred = False
+                last_skill_used = -99999.0
+                pipe_offset = 0.0
+                
+                jumps_sorted = sorted(payload.jumps)
+                jump_idx = 0
+                
+                while t < max_sim_time:
+                    # 1. Jump detection
+                    jumped = False
+                    while jump_idx < len(jumps_sorted) and jumps_sorted[jump_idx] < t + dt:
+                        if jumps_sorted[jump_idx] >= t:
+                            jumped = True
+                        jump_idx += 1
+                    
+                    if jumped:
+                        vy = v_jump
+                    
+                    # 2. Skill activation check
+                    active_invincible = False
+                    active_slow = False
+                    
+                    for sk in skills_list:
+                        sk_time = sk.get("time", 0)
+                        sk_type = sk.get("skill", "")
+                        
+                        if t <= sk_time < t + dt:
+                            cd_limit = 20000 if sk_type == "time_warp" else 15000
+                            if sk_time - last_skill_used >= cd_limit:
+                                last_skill_used = sk_time
+                                
+                                # Instant changes
+                                if hero_id == "xiaoyuan" and sk_type == "fate_warp":
+                                    for idx in range(len(gaps)):
+                                        pipe_x = 700.0 + idx * pipe_dist - pipe_offset
+                                        if pipe_x + pipe_width / 2.0 > bird_x:
+                                            modified_pipes_gap_y[idx] = bird_y
+                                            break
+                                elif hero_id == "azu" and sk_type == "stop_azu":
+                                    for idx in range(len(gaps)):
+                                        pipe_x = 700.0 + idx * pipe_dist - pipe_offset
+                                        if pipe_x + pipe_width / 2.0 > bird_x:
+                                            disabled_pipes.add(idx)
+                                            break
+                                elif hero_id == "fengji" and sk_type == "summit_leap":
+                                    bird_y = max(10.0, bird_y - 70.0)
+                                    vy = -2.0
+                    
+                    # Continuous active skill effects
+                    if last_skill_used >= 0:
+                        matching_sk_type = None
+                        for sk in skills_list:
+                            if abs(sk.get("time", 0) - last_skill_used) < 5:
+                                matching_sk_type = sk.get("skill", "")
+                                break
+                        if matching_sk_type:
+                            elapsed = t - last_skill_used
+                            if matching_sk_type == "thermos_shield" and hero_id == "baowenji" and elapsed < 2000:
+                                active_invincible = True
+                            elif matching_sk_type == "dash" and hero_id == "taxi_ty" and elapsed < 1200:
+                                active_invincible = True
+                            elif matching_sk_type == "steel_body" and hero_id == "brother_gang" and elapsed < 2500:
+                                active_invincible = True
+                            elif matching_sk_type == "time_warp" and hero_id == "taosang" and elapsed < 4000:
+                                active_slow = True
+                    
+                    # 3. Apply physics step
+                    current_g = g_base * g_mult
+                    current_v_pipe = v_pipe_base
+                    
+                    if active_slow:
+                        current_g *= 0.7
+                        current_v_pipe *= 0.5
+                        
+                    vy += current_g
+                    bird_y += vy
+                    pipe_offset += current_v_pipe
+                    
+                    # Screen floor/ceiling check
+                    if bird_y - radius < -15.0 or bird_y + radius > 522.0:
+                        collision_occurred = True
+                        break
+                    
+                    # 4. Collisions
+                    for idx in range(len(gaps)):
+                        if idx in disabled_pipes:
+                            continue
+                        pipe_x = 700.0 + idx * pipe_dist - pipe_offset
+                        
+                        # X-overlap check
+                        if abs(bird_x - pipe_x) < (pipe_width / 2.0 + radius):
+                            gap_y = modified_pipes_gap_y[idx]
+                            gap_h = gap_height_base
+                            if hero_id == "xiaoyuan" and (idx % 3 == 2):
+                                gap_h = gap_height_base * 1.2
+                            
+                            # Y-overlap check with 6px tolerance
+                            if (bird_y - radius < gap_y - gap_h / 2.0 + 6.0) or (bird_y + radius > gap_y + gap_h / 2.0 - 6.0):
+                                if not active_invincible:
+                                    collision_occurred = True
+                                    break
+                        
+                        # Score check
+                        if bird_x - radius > pipe_x + pipe_width / 2.0:
+                            if idx not in pipes_passed:
+                                pipes_passed.add(idx)
+                                score = len(pipes_passed)
+                                if score >= 12:
+                                    break
+                    
+                    if collision_occurred or score >= 12:
+                        break
+                    
+                    t += dt
+                
+                verified = (not collision_occurred) and (score >= 12)
+
     if not verified:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -523,6 +720,8 @@ async def verify_game(request: Request, game_slug: str, payload: GameVerifyPaylo
     if game_slug == "2048" and payload.moves == ["DEBUG_WIN"]:
         is_debug_win = True
     elif game_slug == "minesweeper" and payload.flags is not None and len(payload.flags) == 15 and payload.mistakes == 0:
+        is_debug_win = True
+    elif game_slug == "flappy-hero" and payload.jumps == [-999]:
         is_debug_win = True
 
     is_admin = False
