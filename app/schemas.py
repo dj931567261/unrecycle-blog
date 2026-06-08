@@ -88,6 +88,9 @@ class GameBase(BaseModel):
     description: Optional[str] = None
     difficulty: Optional[str] = "中等"
     is_active: Optional[bool] = True
+    drop_enabled: Optional[bool] = False
+    code_stock: Optional[int] = 0
+    drop_probability: Optional[float] = 0.2
 
 class GameCreate(GameBase):
     secret_hash: Optional[str] = None

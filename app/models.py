@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -48,6 +48,9 @@ class Game(Base):
     difficulty = Column(String, default="中等") # 简单, 中等, 困难
     secret_hash = Column(String, nullable=True) # 谜题答案 SHA-256 哈希值
     is_active = Column(Boolean, default=True)
+    drop_enabled = Column(Boolean, default=False)
+    code_stock = Column(Integer, default=0)
+    drop_probability = Column(Float, default=0.2)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     codes = relationship("RedemptionCode", back_populates="game", cascade="all, delete-orphan")

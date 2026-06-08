@@ -211,6 +211,37 @@
 
         <!-- TAB 4: REDEMPTION CODES -->
         <div id="codes-tab" class="admin-tab-content">
+            <!-- Game settings config panel -->
+            <div class="glass-card" style="padding: 20px; margin-bottom: 24px;">
+                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> 🎯 游戏通关掉落奖励配置
+                </h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                    {% for game in games %}
+                    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">
+                            {% if game.slug == 'minesweeper' %}💣{% else %}🔢{% endif %} {{ game.title }}
+                        </h4>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <label style="font-size: 13px; color: var(--text-secondary); cursor: pointer;" for="game-drop-{{ game.id }}">开启掉落奖励：</label>
+                            <input type="checkbox" id="game-drop-{{ game.id }}" {% if game.drop_enabled %}checked{% endif %} style="cursor: pointer; width: 18px; height: 18px;">
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                            <label style="font-size: 13px; color: var(--text-secondary);">剩余库存 (个)：</label>
+                            <input type="number" id="game-stock-{{ game.id }}" value="{{ game.code_stock }}" min="0" class="search-input" style="width: 80px; padding: 4px 8px; text-align: center;">
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                            <label style="font-size: 13px; color: var(--text-secondary);">掉落概率 (%)：</label>
+                            <input type="number" id="game-prob-{{ game.id }}" value="{{ (game.drop_probability * 100) | int }}" min="0" max="100" class="search-input" style="width: 80px; padding: 4px 8px; text-align: center;">
+                        </div>
+                        <button class="btn btn-primary" onclick="saveGameConfig({{ game.id }})" style="padding: 6px 12px; font-size: 12px; margin-top: 8px;">
+                            <i class="fa-solid fa-floppy-disk"></i> 保存设置
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="action-row" style="margin-bottom: 20px;">
                 <button class="btn btn-danger" onclick="clearAllCodes()"><i class="fa-solid fa-trash-can"></i> 清空所有兑换码记录</button>
             </div>
@@ -864,6 +895,35 @@
                 window.location.reload();
             } else {
                 alert('清空失败');
+            }
+        } catch (err) {
+            alert('网络异常');
+        }
+    }
+
+    async function saveGameConfig(gameId) {
+        const dropEnabled = document.getElementById(`game-drop-${gameId}`).checked;
+        const codeStock = parseInt(document.getElementById(`game-stock-${gameId}`).value) || 0;
+        const probVal = parseInt(document.getElementById(`game-prob-${gameId}`).value) || 0;
+        const dropProbability = parseFloat(probVal / 100).toFixed(2);
+        
+        try {
+            const response = await fetch(`/api/admin/games/${gameId}/config`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    drop_enabled: dropEnabled,
+                    code_stock: codeStock,
+                    drop_probability: parseFloat(dropProbability)
+                })
+            });
+            if (response.ok) {
+                alert('游戏奖励配置已成功保存！');
+            } else {
+                const data = await response.json();
+                alert('保存失败: ' + (data.detail || '未知错误'));
             }
         } catch (err) {
             alert('网络异常');

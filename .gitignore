@@ -126,3 +126,6 @@ Thumbs.db
 # User Uploads (do not commit uploaded media files)
 app/static/uploads/*
 !app/static/uploads/.gitkeep
+
+# Project summary document
+PROJECT_OVERVIEW.md

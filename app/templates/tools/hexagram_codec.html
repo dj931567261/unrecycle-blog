@@ -392,9 +392,48 @@
         }
     });
 
-    // Count chars helper
+    // Auto Convert Helper
+    function autoConvert() {
+        const val = textInput.value;
+        if (!val) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '就绪';
+            codecStatus.style.color = 'var(--text-muted)';
+            return;
+        }
+        try {
+            const trimmedVal = val.trim();
+            if (isCipherText(trimmedVal)) {
+                try {
+                    const res = decodeHexagram(trimmedVal);
+                    textOutput.value = res;
+                    errorBanner.style.display = 'none';
+                    codecStatus.textContent = '智能解密成功';
+                    codecStatus.style.color = 'var(--success)';
+                } catch (e) {
+                    textOutput.value = '';
+                    codecStatus.textContent = '输入解密中...';
+                    codecStatus.style.color = 'var(--text-muted)';
+                }
+            } else {
+                const res = encodeHexagram(val);
+                textOutput.value = res;
+                errorBanner.style.display = 'none';
+                codecStatus.textContent = '智能加密成功';
+                codecStatus.style.color = 'var(--success)';
+            }
+        } catch (err) {
+            textOutput.value = '';
+            codecStatus.textContent = '错误';
+            codecStatus.style.color = 'var(--error)';
+        }
+    }
+
+    // Count chars and auto convert
     textInput.addEventListener('input', () => {
         charCount.textContent = `${textInput.value.length} 字符`;
+        autoConvert();
     });
 
     // Unicode-safe Base64 encoding without padding
@@ -552,6 +591,7 @@
                 errorBanner.style.display = 'none';
                 codecStatus.textContent = '已粘贴';
                 codecStatus.style.color = 'var(--text-muted)';
+                autoConvert(); // Auto convert after paste
             })
             .catch(err => {
                 errorBanner.textContent = `❌ 粘贴失败: 无法访问剪贴板，请使用 Ctrl+V 或 Command+V 手动粘贴`;

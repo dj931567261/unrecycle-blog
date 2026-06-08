@@ -6,7 +6,7 @@
 
     <div style="margin-bottom: 40px; margin-top: 20px;">
         <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">🎮 益智游戏大厅</h1>
-        <p style="color: var(--text-secondary); max-width: 600px;">这里收集了一些烧脑的益智开发小游戏。成功通关不仅能证明你的脑力，更能获得专属的**兑换码奖励**！</p>
+        <p style="color: var(--text-secondary); max-width: 600px;">这里收集了一些烧脑的趣味益智开发小游戏。避开雷区，挑战极限，快来展示你的智力吧！</p>
     </div>
 
     <!-- Games grid -->
@@ -16,8 +16,8 @@
                 <div class="tool-card-icon" style="font-size: 36px; margin-bottom: 16px;">
                     {% if game.slug == 'minesweeper' %}
                         💣
-                    {% elif game.slug == 'sliding-puzzle' %}
-                        🧩
+                    {% elif game.slug == '2048' %}
+                        🔢
                     {% else %}
                         🎯
                     {% endif %}

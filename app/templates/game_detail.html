@@ -209,14 +209,14 @@
         }
 
         /* Number Colors for Minesweeper */
-        .minesweeper-cell.num-1 { color: #38bdf8; } /* Light Blue */
-        .minesweeper-cell.num-2 { color: #4ade80; } /* Light Green */
-        .minesweeper-cell.num-3 { color: #f87171; } /* Red */
-        .minesweeper-cell.num-4 { color: #c084fc; } /* Purple */
-        .minesweeper-cell.num-5 { color: #fb7185; } /* Pink */
-        .minesweeper-cell.num-6 { color: #2dd4bf; } /* Teal */
-        .minesweeper-cell.num-7 { color: #fbbf24; } /* Amber */
-        .minesweeper-cell.num-8 { color: #94a3b8; } /* Slate */
+        .minesweeper-cell.num-1 { color: #38bdf8; }
+        .minesweeper-cell.num-2 { color: #4ade80; }
+        .minesweeper-cell.num-3 { color: #f87171; }
+        .minesweeper-cell.num-4 { color: #c084fc; }
+        .minesweeper-cell.num-5 { color: #fb7185; }
+        .minesweeper-cell.num-6 { color: #2dd4bf; }
+        .minesweeper-cell.num-7 { color: #fbbf24; }
+        .minesweeper-cell.num-8 { color: #94a3b8; }
 
         @keyframes pulse-red {
             from {
@@ -235,52 +235,90 @@
             75% { transform: translateX(3px); }
         }
 
-        /* Sliding Puzzle styles */
-        .sliding-puzzle-wrapper {
+        /* 2048 styles */
+        .game2048-wrapper {
             max-width: 320px;
             margin: 0 auto;
         }
 
-        .sliding-puzzle-container {
+        .game2048-container {
             position: relative;
-            width: 300px;
-            height: 300px;
+            width: 290px;
+            height: 290px;
             margin: 0 auto;
-            background: rgba(0, 0, 0, 0.15);
+            background: rgba(0, 0, 0, 0.25);
             border: 2px solid var(--border-color);
             border-radius: 12px;
-            overflow: hidden;
+            padding: 10px;
+            box-sizing: border-box;
         }
 
-        .sliding-tile {
+        .game2048-grid-bg {
             position: absolute;
-            width: 90px;
-            height: 90px;
-            background: var(--bg-surface-solid);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            top: 10px;
+            left: 10px;
+            width: 270px;
+            height: 270px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            z-index: 1;
+        }
+
+        .game2048-grid-cell {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        html[data-theme="light"] .game2048-grid-cell {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .game2048-tile {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
+            font-size: 20px;
             font-weight: 800;
-            color: var(--text-primary);
-            cursor: pointer;
-            user-select: none;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-            transition: top 0.18s cubic-bezier(0.25, 1, 0.5, 1), left 0.18s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s, border-color 0.2s;
+            z-index: 2;
+            transition: top 0.15s ease, left 0.15s ease;
+            animation: spawn-tile 0.15s ease-out;
         }
 
-        .sliding-tile:hover {
-            background: var(--bg-input-focus);
-            border-color: var(--accent-blue);
+        @keyframes spawn-tile {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
-        .sliding-tile.empty {
-            display: none;
+        @keyframes merge-tile {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
         }
 
-        .sliding-puzzle-info {
+        .game2048-tile.merged {
+            animation: merge-tile 0.15s ease-in-out;
+        }
+
+        /* Tile color palettes - vibrant styled */
+        .tile-2 { background: #eee4da; color: #776e65; }
+        .tile-4 { background: #ede0c8; color: #776e65; }
+        .tile-8 { background: #f2b179; color: #f9f6f2; box-shadow: 0 0 8px rgba(242, 177, 121, 0.4); }
+        .tile-16 { background: #f59563; color: #f9f6f2; box-shadow: 0 0 8px rgba(245, 149, 99, 0.4); }
+        .tile-32 { background: #f67c5f; color: #f9f6f2; box-shadow: 0 0 8px rgba(246, 124, 95, 0.4); }
+        .tile-64 { background: #f65e3b; color: #f9f6f2; box-shadow: 0 0 8px rgba(246, 94, 59, 0.4); }
+        .tile-128 { background: #edcf72; color: #f9f6f2; box-shadow: 0 0 10px rgba(237, 207, 114, 0.5); font-size: 18px; }
+        .tile-256 { background: #edcc61; color: #f9f6f2; box-shadow: 0 0 10px rgba(237, 204, 97, 0.5); font-size: 18px; }
+        .tile-512 { background: #edc850; color: #f9f6f2; box-shadow: 0 0 10px rgba(237, 200, 80, 0.5); font-size: 18px; }
+        .tile-1024 { background: #edc53f; color: #f9f6f2; box-shadow: 0 0 12px rgba(237, 197, 63, 0.6); font-size: 16px; }
+        .tile-2048 { background: #edc22e; color: #f9f6f2; box-shadow: 0 0 15px rgba(237, 194, 46, 0.8); font-size: 16px; }
+
+        .game2048-info {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -297,7 +335,7 @@
         </a>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
             <h1 style="font-size: 26px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-                {% if game.slug == 'minesweeper' %}💣{% else %}🧩{% endif %} {{ game.title }}
+                {% if game.slug == 'minesweeper' %}💣{% else %}🔢{% endif %} {{ game.title }}
             </h1>
             <span class="history-badge {% if game.difficulty == '简单' %}encode{% elif game.difficulty == '中等' %}decode{% else %}auto{% endif %}">
                 {{ game.difficulty }}
@@ -357,36 +395,54 @@
                 </ul>
             </div>
 
-        {% elif game.slug == 'sliding-puzzle' %}
-            <!-- SLIDING PUZZLE GAME AREA -->
-            <div class="sliding-puzzle-wrapper">
-                <div class="sliding-puzzle-info">
+        {% elif game.slug == '2048' %}
+            <!-- 2048 GAME AREA -->
+            <div class="game2048-wrapper">
+                <div class="game2048-info">
                     <div>
-                        <span>步数:</span>
-                        <span id="sp-steps" style="color: var(--accent-blue); font-family: var(--font-mono);">0</span>
+                        <span>得分:</span>
+                        <span id="g2-score" style="color: var(--accent-blue); font-family: var(--font-mono);">0</span>
                     </div>
-                    <div id="sp-timer">
+                    <div id="g2-timer">
                         <i class="fa-regular fa-clock"></i> 用时: 00:00
                     </div>
                 </div>
 
-                <div class="sliding-puzzle-container" id="sp-container">
-                    <!-- Absolute-positioned blocks generated via Javascript -->
+                <div class="game2048-container" id="g2-container">
+                    <div class="game2048-grid-bg">
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                        <div class="game2048-grid-cell"></div>
+                    </div>
+                    <!-- Tiles are generated dynamically via JavaScript -->
                 </div>
 
                 <div style="display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap;">
-                    <button id="sp-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
-                        <i class="fa-solid fa-rotate-left"></i> 重新打乱
+                    <button id="g2-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
+                        <i class="fa-solid fa-rotate-left"></i> 重新开始
                     </button>
-                    <button id="sp-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
+                    <button id="g2-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
                         <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
                     </button>
                 </div>
 
                 <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: center;">
                     <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
-                        <strong>玩法：</strong> 点击与空白格相邻的数字滑块，或使用键盘上的 <strong>方向键 (↑ ↓ ← →)</strong> 移动滑块。<br>
-                        当网格重新排列成 <strong>1 到 8</strong> 的顺序（最后右下角留空）时，即可成功通关并生成兑换码！
+                        <strong>玩法：</strong> 使用键盘上的 <strong>方向键 (↑ ↓ ← →)</strong> 或在网格上滑动以合并相同数字的方块。<br>
+                        当成功合并出 <strong>2048</strong> 的方块时即可通关！
                     </p>
                 </div>
             </div>
@@ -403,25 +459,29 @@
         <div class="victory-card">
             <div style="font-size: 64px; margin-bottom: 16px;">🎉</div>
             <h2 style="font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">恭喜通关！</h2>
-            <p style="color: var(--text-secondary); font-size: 14px;">你已经成功完成了该游戏的脑力挑战，以下是你的通关专属兑换码：</p>
+            <p id="victory-message" style="color: var(--text-secondary); font-size: 14px;">你已经成功完成了该游戏的脑力挑战！</p>
             
-            <div class="code-display-box">
-                <span id="victory-code-text">UM-TEMP-123456</span>
-                <button id="copy-code-btn" class="btn-icon" title="复制兑换码" style="color: var(--accent-blue); padding: 4px; border: none; background: none; cursor: pointer;">
-                    <i class="fa-solid fa-copy"></i>
-                </button>
-            </div>
-
-            <div style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-top: 24px;">
-                <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i> 兑换及使用指南：
-                </h4>
-                <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 20px; line-height: 1.8;">
-                    <li>1. 点击兑换码旁边的按钮一键复制该代码。</li>
-                    <li>2. 关注站长微信公众号 <strong>Unrecycle</strong> 或者添加站长个人微信号。</li>
-                    <li>3. 在微信后台发送此兑换码，系统将自动核销并为您发放神秘通关奖励（如专属纪念徽章或全栈学习礼包）！</li>
-                    <li><em>说明：每个兑换码在数据库中唯一绑定并记录，不可重复核销或伪造。</em></li>
-                </ul>
+            <!-- Conditional Code Box (hidden by default) -->
+            <div id="victory-code-container" style="display: none;">
+                <p style="color: var(--text-secondary); font-size: 14px; margin-top: 10px;">幸运掉落！你获得了专属的通关兑换码：</p>
+                <div class="code-display-box">
+                    <span id="victory-code-text">UM-TEMP-123456</span>
+                    <button id="copy-code-btn" class="btn-icon" title="复制兑换码" style="color: var(--accent-blue); padding: 4px; border: none; background: none; cursor: pointer;">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
+    
+                <div style="text-align: left; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-top: 24px;">
+                    <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i> 兑换及使用指南：
+                    </h4>
+                    <ul style="font-size: 12px; color: var(--text-secondary); padding-left: 20px; line-height: 1.8;">
+                        <li>1. 点击兑换码旁边的按钮一键复制该代码。</li>
+                        <li>2. 关注站长微信公众号 <strong>Unrecycle</strong> 或者添加站长个人微信号。</li>
+                        <li>3. 在微信后台发送此兑换码，系统将自动核销并为您发放神秘通关奖励（如专属纪念徽章或全栈学习礼包）！</li>
+                        <li><em>说明：每个兑换码在数据库中唯一绑定并记录，不可重复核销或伪造。</em></li>
+                    </ul>
+                </div>
             </div>
 
             <button id="close-victory-btn" class="btn btn-primary" style="margin-top: 24px; width: 100%; padding: 10px 0;">
@@ -441,8 +501,7 @@
         toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
         toastContainer.appendChild(toast);
         
-        // Trigger reflow
-        toast.offsetHeight;
+        toast.offsetHeight; // trigger reflow
         toast.classList.add('show');
         
         setTimeout(() => {
@@ -461,7 +520,18 @@
     const gameErrorBanner = document.getElementById('game-error-banner');
 
     function showVictory(code) {
-        victoryCodeText.textContent = code;
+        const codeContainer = document.getElementById('victory-code-container');
+        const victoryMsg = document.getElementById('victory-message');
+        
+        if (code) {
+            victoryCodeText.textContent = code;
+            codeContainer.style.display = 'block';
+            victoryMsg.textContent = "你已经成功完成了该游戏的脑力挑战！";
+            showToast("🎁 恭喜！获得了幸运奖励掉落！", "🎉");
+        } else {
+            codeContainer.style.display = 'none';
+            victoryMsg.textContent = "你已经成功完成了该游戏的脑力挑战！感谢您的游玩，继续挑战其他游戏吧！";
+        }
         victoryModal.classList.add('open');
     }
 
@@ -505,8 +575,8 @@
         const testBtn = document.getElementById('ms-test-btn');
 
         let board = [];
-        let mines = []; // List of coordinates, e.g., ["2,3", ...]
-        let bombs = []; // Time bomb coordinates
+        let mines = [];
+        let bombs = [];
         let gameToken = '';
         
         let hp = 3;
@@ -517,11 +587,9 @@
         let gameOver = false;
         let gameWon = false;
 
-        // Long press detection variables for mobile flag toggle
         let touchTimer;
         let isLongPress = false;
 
-        // Fetch initialization
         function startGame() {
             showError(null);
             gameOver = false;
@@ -531,7 +599,6 @@
             mistakes = 0;
             timeElapsed = 0;
             
-            // Clean active bomb timers if any
             board.forEach(row => {
                 row.forEach(cell => {
                     if (cell.tickInterval) {
@@ -540,24 +607,19 @@
                 });
             });
 
-            // Update header UI
             updateHeaderUI();
             
-            // Fetch game data
             fetch(`/api/games/minesweeper/start`)
                 .then(res => res.json())
                 .then(data => {
                     gameToken = data.token;
                     
-                    // Decode token to reveal mines for our local client logic (needed for count-up calculation etc.)
-                    // This is client-side validated securely via the signed token upon verify
                     try {
                         const payloadStr = atob(gameToken.split('.')[0] || gameToken);
                         const payload = JSON.parse(payloadStr);
                         mines = payload.data.mines.map(m => `${m[0]},${m[1]}`);
                         bombs = payload.data.bombs.map(b => `${b[0]},${b[1]}`);
                     } catch (e) {
-                        // Fallback in case token format is direct base64 encoded payload instead of JWT dot separated
                         const payload = JSON.parse(atob(gameToken));
                         mines = payload.data.mines.map(m => `${m[0]},${m[1]}`);
                         bombs = payload.data.bombs.map(b => `${b[0]},${b[1]}`);
@@ -582,17 +644,13 @@
         }
 
         function updateHeaderUI() {
-            // HP
             let hearts = "";
             for (let i = 1; i <= 3; i++) {
                 hearts += (i <= hp) ? "💖 " : "🤍 ";
             }
             hpHeartsEl.textContent = hearts.trim();
-
-            // Shield
             shieldEl.innerHTML = shield > 0 ? `<span style="color: var(--success);">🛡️ 1</span>` : `🛡️ 0`;
 
-            // Flags
             let flaggedCount = 0;
             board.forEach(row => {
                 row.forEach(c => {
@@ -628,7 +686,6 @@
                     cellEl.dataset.r = r;
                     cellEl.dataset.c = c;
 
-                    // Click Actions
                     cellEl.addEventListener('click', (e) => {
                         if (isLongPress) {
                             isLongPress = false;
@@ -637,20 +694,18 @@
                         handleCellLeftClick(r, c);
                     });
 
-                    // Flag Trigger on Right Click
                     cellEl.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         handleCellRightClick(r, c);
                     });
 
-                    // Mobile long-press touch interactions
                     cellEl.addEventListener('touchstart', (e) => {
                         isLongPress = false;
                         touchTimer = setTimeout(() => {
                             isLongPress = true;
                             handleCellRightClick(r, c);
                             showToast("标记标记点", "🚩");
-                        }, 500); // 500ms holds triggers flag
+                        }, 500);
                     });
 
                     cellEl.addEventListener('touchend', (e) => {
@@ -674,7 +729,6 @@
             const cell = board[r][c];
             if (cell.isRevealed || cell.isFlagged) return;
 
-            // Trigger mine
             if (cell.isMine || cell.isBomb) {
                 detonateCell(cell);
                 return;
@@ -701,7 +755,6 @@
 
             revealCell(r, c);
             
-            // Item drop check (10% chance)
             if (Math.random() < 0.10) {
                 rollItemDrop(r, c);
             }
@@ -724,7 +777,6 @@
                 cell.el.classList.remove('flagged');
                 cell.el.textContent = '';
             } else {
-                // Count current flags
                 let flags = 0;
                 board.forEach(row => row.forEach(c => { if (c.isFlagged) flags++; }));
                 if (flags >= 15) {
@@ -754,7 +806,6 @@
                 cell.el.classList.add(`num-${count}`);
             } else {
                 cell.el.textContent = '';
-                // Flood Fill
                 const neighbors = getNeighbors(r, c);
                 neighbors.forEach(n => {
                     const nc = board[n[0]][n[1]];
@@ -764,7 +815,6 @@
                 });
             }
 
-            // Trigger ticking on adjacent bombs
             const neighbors = getNeighbors(r, c);
             neighbors.forEach(n => {
                 const neighborCell = board[n[0]][n[1]];
@@ -802,7 +852,6 @@
             cell.el.classList.add('exploded');
             cell.el.innerHTML = `<i class="fa-solid fa-bomb"></i>`;
             
-            // Damage check
             if (shield > 0) {
                 shield = 0;
                 showToast("🛡️ 护盾抵挡了爆炸伤害！", "🛡️");
@@ -846,7 +895,6 @@
         function rollItemDrop(r, c) {
             const roll = Math.random();
             if (roll < 0.40) {
-                // Shield 🛡️
                 if (shield < 1) {
                     shield = 1;
                     showToast("获得宝箱：🛡️ 战能护盾已装备！", "🛡️");
@@ -854,7 +902,6 @@
                     showToast("获得宝箱：已经拥有护盾，无法重复装备。", "🛡️");
                 }
             } else if (roll < 0.70) {
-                // Heart ❤️
                 if (hp < 3) {
                     hp++;
                     showToast("获得宝箱：❤️ 生命值恢复 +1！", "❤️");
@@ -862,10 +909,8 @@
                     showToast("获得宝箱：生命已满，无法继续回复。", "❤️");
                 }
             } else {
-                // Radar 🔍
                 showToast("获得宝箱：🔍 探测雷达扫描中...", "🔍");
                 const neighbors = getNeighbors(r, c);
-                // Highlight mines temporarily
                 neighbors.forEach(n => {
                     const nc = board[n[0]][n[1]];
                     if ((nc.isMine || nc.isBomb) && !nc.isRevealed) {
@@ -882,11 +927,9 @@
         function checkMinesweeperGameStatus() {
             if (gameOver || gameWon) return;
 
-            // Condition 1: Check if all non-mine cells are revealed
             let allSafeRevealed = true;
             let correctFlagsCount = 0;
             let wrongFlagsCount = 0;
-            let flaggedMines = [];
 
             board.forEach(row => {
                 row.forEach(c => {
@@ -896,15 +939,12 @@
                     } else {
                         if (c.isFlagged || c.isRevealed) {
                             correctFlagsCount++;
-                            flaggedMines.push([c.r, c.c]);
                         }
                     }
                 });
             });
 
-            // If we solved all safe cells OR all 15 mines are identified and mistakes are safe
             if ((allSafeRevealed || correctFlagsCount === 15) && wrongFlagsCount === 0 && hp > 0) {
-                // Collect exact flagged and exploded coordinates to submit
                 const finalFlags = [];
                 board.forEach(row => {
                     row.forEach(c => {
@@ -921,7 +961,6 @@
             gameWon = true;
             clearInterval(timerInterval);
             
-            // Call verify API
             fetch(`/api/games/minesweeper/verify`, {
                 method: 'POST',
                 headers: {
@@ -950,7 +989,6 @@
             gameOver = true;
             clearInterval(timerInterval);
             
-            // Clear ticking intervals
             board.forEach(row => {
                 row.forEach(c => {
                     if (c.tickInterval) clearInterval(c.tickInterval);
@@ -960,7 +998,6 @@
             if (!success) {
                 showToast("💀 挑战失败！生命值已耗尽。", "💀");
                 showError("💀 生命值已耗尽！请点击「重新开始」进行新一轮挑战。");
-                // Reveal all mines on board
                 board.forEach(row => {
                     row.forEach(c => {
                         if (c.isMine || c.isBomb) {
@@ -998,51 +1035,49 @@
         });
 
         resetBtn.addEventListener('click', startGame);
-
-        // Run
         startGame();
 
     // ----------------------------------------
-    // 2. SLIDING PUZZLE LOGIC
+    // 2. 2048 LOGIC
     // ----------------------------------------
-    } else if (gameSlug === 'sliding-puzzle') {
-        const container = document.getElementById('sp-container');
-        const stepsEl = document.getElementById('sp-steps');
-        const timerEl = document.getElementById('sp-timer');
-        const resetBtn = document.getElementById('sp-reset-btn');
-        const testBtn = document.getElementById('sp-test-btn');
+    } else if (gameSlug === '2048') {
+        const container = document.getElementById('g2-container');
+        const scoreEl = document.getElementById('g2-score');
+        const timerEl = document.getElementById('g2-timer');
+        const resetBtn = document.getElementById('g2-reset-btn');
+        const testBtn = document.getElementById('g2-test-btn');
 
         let b = [];
         let movesList = [];
+        let spawnsList = [];
         let gameToken = '';
         
-        let steps = 0;
+        let score = 0;
         let timerInterval;
         let timeElapsed = 0;
         let gameOver = false;
         let gameWon = false;
-        const tilesMap = {};
 
-        function startPuzzle() {
+        function start2048() {
             showError(null);
             gameOver = false;
             gameWon = false;
-            steps = 0;
+            score = 0;
             timeElapsed = 0;
             movesList = [];
-            stepsEl.textContent = '0';
+            spawnsList = [];
+            scoreEl.textContent = '0';
             
-            fetch(`/api/games/sliding-puzzle/start`)
+            fetch(`/api/games/2048/start`)
                 .then(res => res.json())
                 .then(data => {
                     gameToken = data.token;
                     b = data.board;
-                    
-                    initPuzzleGrid();
+                    update2048UI();
                     startTimer();
                 })
                 .catch(err => {
-                    showError("无法从服务器启动拼图游戏，请刷新页面重试！");
+                    showError("无法从服务器启动2048游戏，请刷新页面重试！");
                 });
         }
 
@@ -1056,85 +1091,198 @@
             }, 1000);
         }
 
-        function initPuzzleGrid() {
-            container.innerHTML = '';
-            for (let val = 1; val <= 8; val++) {
-                const tile = document.createElement('div');
-                tile.className = 'sliding-tile';
-                tile.textContent = val;
-                
-                tile.addEventListener('click', () => {
-                    if (gameOver || gameWon) return;
-                    const currentIdx = b.indexOf(val);
-                    handleTileClick(currentIdx);
-                });
-                
-                container.appendChild(tile);
-                tilesMap[val] = tile;
-            }
-            updatePuzzleUI();
-        }
-
-        function updatePuzzleUI() {
-            for (let i = 0; i < 9; i++) {
+        function update2048UI() {
+            const oldTiles = container.querySelectorAll('.game2048-tile');
+            oldTiles.forEach(t => t.remove());
+            
+            for (let i = 0; i < 16; i++) {
                 const val = b[i];
                 if (val === 0) continue;
-                const tile = tilesMap[val];
-                const row = Math.floor(i / 3);
-                const col = i % 3;
-                tile.style.left = (col * 100 + 5) + 'px';
-                tile.style.top = (row * 100 + 5) + 'px';
+                
+                const tileEl = document.createElement('div');
+                tileEl.className = `game2048-tile tile-${val}`;
+                tileEl.textContent = val;
+                
+                const row = Math.floor(i / 4);
+                const col = i % 4;
+                tileEl.style.left = (10 + col * 70) + 'px';
+                tileEl.style.top = (10 + row * 70) + 'px';
+                
+                container.appendChild(tileEl);
+            }
+            scoreEl.textContent = score;
+        }
+
+        function handleInput(dir) {
+            if (gameOver || gameWon) return;
+            
+            const changed = slideAndMerge(dir);
+            if (changed) {
+                movesList.push(dir);
+                spawnRandomTile();
+                update2048UI();
+                checkVictory();
+                
+                if (isGameOver()) {
+                    gameOver = true;
+                    clearInterval(timerInterval);
+                    showToast("💀 游戏结束！没有可合并的方块了。", "💀");
+                    showError("💀 游戏结束！请点击「重新开始」进行新一轮挑战。");
+                }
             }
         }
 
-        function handleTileClick(idx) {
-            const zeroIdx = b.indexOf(0);
-            const moves = getValidMoves(zeroIdx);
-            const move = moves.find(m => m.nextIdx === idx);
-            if (move) {
-                // Swap values
-                b[zeroIdx] = b[idx];
-                b[idx] = 0;
-                
-                steps++;
-                stepsEl.textContent = steps;
-                movesList.push(move.dir);
-                
-                updatePuzzleUI();
-                checkPuzzleSolved();
+        function slideAndMerge(direction) {
+            let grid = [];
+            for (let r = 0; r < 4; r++) {
+                grid.push(b.slice(r * 4, r * 4 + 4));
             }
+            
+            let changed = false;
+            let scoreGain = 0;
+            
+            if (direction === 'L' || direction === 'R') {
+                for (let r = 0; r < 4; r++) {
+                    let row = grid[r];
+                    let nonZeros = row.filter(x => x !== 0);
+                    let merged = [];
+                    if (direction === 'L') {
+                         let i = 0;
+                         while (i < nonZeros.length) {
+                             if (i + 1 < nonZeros.length && nonZeros[i] === nonZeros[i+1]) {
+                                 merged.push(nonZeros[i] * 2);
+                                 scoreGain += nonZeros[i] * 2;
+                                 i += 2;
+                             } else {
+                                 merged.push(nonZeros[i]);
+                                 i += 1;
+                             }
+                         }
+                         while (merged.length < 4) merged.push(0);
+                    } else { // 'R'
+                         let i = nonZeros.length - 1;
+                         while (i >= 0) {
+                             if (i - 1 >= 0 && nonZeros[i] === nonZeros[i-1]) {
+                                 merged.unshift(nonZeros[i] * 2);
+                                 scoreGain += nonZeros[i] * 2;
+                                 i -= 2;
+                             } else {
+                                 merged.unshift(nonZeros[i]);
+                                 i -= 1;
+                             }
+                         }
+                         while (merged.length < 4) merged.unshift(0);
+                    }
+                    if (JSON.stringify(merged) !== JSON.stringify(row)) {
+                        changed = true;
+                    }
+                    grid[r] = merged;
+                }
+            } else { // 'U' or 'D'
+                for (let c = 0; c < 4; c++) {
+                    let col = [grid[0][c], grid[1][c], grid[2][c], grid[3][c]];
+                    let nonZeros = col.filter(x => x !== 0);
+                    let merged = [];
+                    if (direction === 'U') {
+                         let i = 0;
+                         while (i < nonZeros.length) {
+                             if (i + 1 < nonZeros.length && nonZeros[i] === nonZeros[i+1]) {
+                                 merged.push(nonZeros[i] * 2);
+                                 scoreGain += nonZeros[i] * 2;
+                                 i += 2;
+                             } else {
+                                 merged.push(nonZeros[i]);
+                                 i += 1;
+                             }
+                         }
+                         while (merged.length < 4) merged.push(0);
+                    } else { // 'D'
+                         let i = nonZeros.length - 1;
+                         while (i >= 0) {
+                             if (i - 1 >= 0 && nonZeros[i] === nonZeros[i-1]) {
+                                 merged.unshift(nonZeros[i] * 2);
+                                 scoreGain += nonZeros[i] * 2;
+                                 i -= 2;
+                             } else {
+                                 merged.unshift(nonZeros[i]);
+                                 i -= 1;
+                             }
+                         }
+                         while (merged.length < 4) merged.unshift(0);
+                    }
+                    if (JSON.stringify(merged) !== JSON.stringify(col)) {
+                        changed = true;
+                    }
+                    for (let r = 0; r < 4; r++) {
+                        grid[r][c] = merged[r];
+                    }
+                }
+            }
+            
+            if (changed) {
+                let newBoard = [];
+                for (let r = 0; r < 4; r++) {
+                    newBoard = newBoard.concat(grid[r]);
+                }
+                b = newBoard;
+                score += scoreGain;
+                return true;
+            }
+            return false;
         }
 
-        function getValidMoves(zeroIdx) {
-            const moves = [];
-            if (zeroIdx >= 3) moves.push({ dir: "U", nextIdx: zeroIdx - 3 });
-            if (zeroIdx < 6) moves.push({ dir: "D", nextIdx: zeroIdx + 3 });
-            if (zeroIdx % 3 !== 0) moves.push({ dir: "L", nextIdx: zeroIdx - 1 });
-            if (zeroIdx % 3 !== 2) moves.push({ dir: "R", nextIdx: zeroIdx + 1 });
-            return moves;
+        function spawnRandomTile() {
+            let emptyIndices = [];
+            for (let i = 0; i < 16; i++) {
+                if (b[i] === 0) emptyIndices.push(i);
+            }
+            if (emptyIndices.length === 0) return;
+            
+            let randIdx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+            let randVal = Math.random() < 0.9 ? 2 : 4;
+            
+            b[randIdx] = randVal;
+            spawnsList.push({ pos: randIdx, val: randVal });
         }
 
-        function checkPuzzleSolved() {
-            const target = [1, 2, 3, 4, 5, 6, 7, 8, 0];
-            const solved = b.every((val, index) => val === target[index]);
-            if (solved) {
+        function isGameOver() {
+            if (b.includes(0)) return false;
+            
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 3; c++) {
+                    let idx = r * 4 + c;
+                    if (b[idx] === b[idx + 1]) return false;
+                }
+            }
+            
+            for (let c = 0; c < 4; c++) {
+                for (let r = 0; r < 3; r++) {
+                    let idx = r * 4 + c;
+                    if (b[idx] === b[idx + 4]) return false;
+                }
+            }
+            return true;
+        }
+
+        function checkVictory() {
+            if (b.includes(2048) && !gameWon) {
                 gameWon = true;
                 clearInterval(timerInterval);
                 
-                // Submit verifying moves sequence to backend
-                fetch(`/api/games/sliding-puzzle/verify`, {
+                fetch(`/api/games/2048/verify`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         token: gameToken,
-                        moves: movesList
+                        moves: movesList,
+                        spawns: spawnsList
                     })
                 })
-                .then(async response => {
-                    const data = await response.json();
-                    if (response.ok) {
+                .then(async res => {
+                    const data = await res.json();
+                    if (res.ok) {
                         showVictory(data.code);
                     } else {
                         showError("❌ " + (data.error || "校验失败！"));
@@ -1148,141 +1296,89 @@
 
         // Keyboard navigation
         window.addEventListener('keydown', (e) => {
-            if (gameSlug !== 'sliding-puzzle') return;
+            if (gameSlug !== '2048') return;
             if (gameOver || gameWon) return;
             
-            const zeroIdx = b.indexOf(0);
-            let targetIdx = -1;
             let dir = "";
+            if (e.key === 'ArrowUp') dir = "U";
+            else if (e.key === 'ArrowDown') dir = "D";
+            else if (e.key === 'ArrowLeft') dir = "L";
+            else if (e.key === 'ArrowRight') dir = "R";
             
-            if (e.key === 'ArrowUp') {
-                // Empty slot moves down (D)
-                if (zeroIdx < 6) {
-                    targetIdx = zeroIdx + 3;
-                    dir = "D";
-                }
-            } else if (e.key === 'ArrowDown') {
-                // Empty slot moves up (U)
-                if (zeroIdx >= 3) {
-                    targetIdx = zeroIdx - 3;
-                    dir = "U";
-                }
-            } else if (e.key === 'ArrowLeft') {
-                // Empty slot moves right (R)
-                if (zeroIdx % 3 !== 2) {
-                    targetIdx = zeroIdx + 1;
-                    dir = "R";
-                }
-            } else if (e.key === 'ArrowRight') {
-                // Empty slot moves left (L)
-                if (zeroIdx % 3 !== 0) {
-                    targetIdx = zeroIdx - 1;
-                    dir = "L";
-                }
-            }
-            
-            if (targetIdx !== -1) {
-                b[zeroIdx] = b[targetIdx];
-                b[targetIdx] = 0;
-                
-                steps++;
-                stepsEl.textContent = steps;
-                movesList.push(dir);
-                
-                updatePuzzleUI();
-                checkPuzzleSolved();
-                e.preventDefault(); // prevent scrolling
+            if (dir !== "") {
+                handleInput(dir);
+                e.preventDefault();
             }
         });
 
-        // 8-Puzzle BFS Solver for Debug
-        function solve8Puzzle(startBoard) {
-            const target = "1,2,3,4,5,6,7,8,0";
-            const startStr = startBoard.join(",");
-            if (startStr === target) return [];
+        // Mobile Swipe navigation
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        container.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        container.addEventListener('touchend', (e) => {
+            if (gameOver || gameWon) return;
+            let touchEndX = e.changedTouches[0].screenX;
+            let touchEndY = e.changedTouches[0].screenY;
             
-            const queue = [{ board: startBoard, path: [] }];
-            const visited = new Set();
-            visited.add(startStr);
+            let dx = touchEndX - touchStartX;
+            let dy = touchEndY - touchStartY;
             
-            let limit = 40000;
-            while (queue.length > 0 && limit-- > 0) {
-                const current = queue.shift();
-                const board = current.board;
-                const path = current.path;
-                
-                const idx = board.indexOf(0);
-                const nextMoves = [];
-                if (idx >= 3) nextMoves.push({ dir: "U", nextIdx: idx - 3 });
-                if (idx < 6) nextMoves.push({ dir: "D", nextIdx: idx + 3 });
-                if (idx % 3 !== 0) nextMoves.push({ dir: "L", nextIdx: idx - 1 });
-                if (idx % 3 !== 2) nextMoves.push({ dir: "R", nextIdx: idx + 1 });
-                
-                for (const m of nextMoves) {
-                    const nextBoard = [...board];
-                    nextBoard[idx] = nextBoard[m.nextIdx];
-                    nextBoard[m.nextIdx] = 0;
-                    
-                    const nextStr = nextBoard.join(",");
-                    const nextPath = [...path, m.dir];
-                    
-                    if (nextStr === target) {
-                        return nextPath;
-                    }
-                    
-                    if (!visited.has(nextStr)) {
-                        visited.add(nextStr);
-                        queue.push({ board: nextBoard, path: nextPath });
-                    }
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > 30) {
+                    if (dx > 0) handleInput('R');
+                    else handleInput('L');
+                }
+            } else {
+                if (Math.abs(dy) > 30) {
+                    if (dy > 0) handleInput('D');
+                    else handleInput('U');
                 }
             }
-            return null;
-        }
+        }, { passive: true });
 
+        // Admin Debug test bypass
         testBtn.addEventListener('click', () => {
             if (gameOver || gameWon) return;
-            showToast("🔮 计算拼图还原路径中...", "🔮");
-            const startBoard = [...b];
-            const path = solve8Puzzle(startBoard);
-            if (!path) {
-                showToast("未找到可解路径，请重置！", "❌");
-                return;
-            }
+            showToast("🔮 发送开发一键通关请求...", "🔮");
             
-            showToast(`找到还原路径，共 ${path.length} 步，正在自动通关...`, "🔮");
-            
-            // Swap board elements instantly to target sorted
-            b = [1, 2, 3, 4, 5, 6, 7, 8, 0];
-            updatePuzzleUI();
-            
-            // Submit solving moves to backend
-            fetch(`/api/games/sliding-puzzle/verify`, {
+            fetch(`/api/games/2048/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     token: gameToken,
-                    moves: path
+                    moves: ["DEBUG_WIN"],
+                    spawns: []
                 })
             })
-            .then(async response => {
-                const data = await response.json();
-                if (response.ok) {
+            .then(async res => {
+                const data = await res.json();
+                if (res.ok) {
+                    b = [
+                        2048, 1024, 512, 256,
+                        128, 64, 32, 16,
+                        8, 4, 2, 0,
+                        0, 0, 0, 0
+                    ];
+                    update2048UI();
                     showVictory(data.code);
                 } else {
-                    showError("❌ " + (data.error || "校验失败！"));
+                    showError("❌ " + (data.error || "校验失败！(您必须是已登录的管理员才能使用此测试按钮)"));
                 }
             })
             .catch(err => {
-                showError("❌ 校验服务发生错误！");
+                showError("❌ 校验服务出错，请重试！");
             });
         });
 
-        resetBtn.addEventListener('click', startPuzzle);
-
-        // Run
-        startPuzzle();
+        resetBtn.addEventListener('click', start2048);
+        start2048();
     }
 </script>
 {% endblock %}

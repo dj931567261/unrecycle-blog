@@ -16,6 +16,20 @@ from app.config import UPLOAD_DIR, ADMIN_USERNAME
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
 
+# Run SQLite migrations for Game config columns
+from sqlalchemy import inspect, text
+inspector = inspect(engine)
+try:
+    columns = [c["name"] for c in inspector.get_columns("games")]
+    if "drop_enabled" not in columns:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE games ADD COLUMN drop_enabled BOOLEAN DEFAULT 0"))
+            conn.execute(text("ALTER TABLE games ADD COLUMN code_stock INTEGER DEFAULT 0"))
+            conn.execute(text("ALTER TABLE games ADD COLUMN drop_probability FLOAT DEFAULT 0.2"))
+            conn.commit()
+except Exception as e:
+    print(f"⚠️ Migration failed: {e}")
+
 app = FastAPI(title="Unrecycle-Me", description="Personal Developer Dashboard & Blog")
 
 import time
@@ -83,29 +97,37 @@ def seed_initial_data():
             db.commit()
 
         # Check and seed Games
-        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle"])).delete(synchronize_session=False)
+        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle", "sliding-puzzle"])).delete(synchronize_session=False)
         db.commit()
 
-        if db.query(models.Game).filter(models.Game.slug.in_(["minesweeper", "sliding-puzzle"])).count() == 0:
-            games = [
-                models.Game(
-                    title="战损级 RPG 扫雷",
-                    slug="minesweeper",
-                    description="融合了 RPG 生命值与道具机制，以及心跳倒计时的定时雷扫雷挑战！避开地雷，解救危机，获取专属兑换码。",
-                    difficulty="困难",
-                    secret_hash=None,
-                    is_active=True
-                ),
-                models.Game(
-                    title="极客拼图滑块",
-                    slug="sliding-puzzle",
-                    description="经典数字华容道（8宫格拼图）。滑动滑块，将数字拼回顺序（1-8 + 空白格），通关即可得到兑换码。",
-                    difficulty="中等",
-                    secret_hash=None,
-                    is_active=True
-                )
-            ]
-            db.add_all(games)
+        # Seed Minesweeper
+        if db.query(models.Game).filter(models.Game.slug == "minesweeper").count() == 0:
+            db.add(models.Game(
+                title="战损级 RPG 扫雷",
+                slug="minesweeper",
+                description="融合了 RPG 生命值与道具机制，以及心跳倒计时的定时雷扫雷挑战！避开地雷，拆除定时炸弹，测试你的反应极限！",
+                difficulty="困难",
+                secret_hash=None,
+                is_active=True,
+                drop_enabled=False,
+                code_stock=0,
+                drop_probability=0.2
+            ))
+            db.commit()
+
+        # Seed 2048
+        if db.query(models.Game).filter(models.Game.slug == "2048").count() == 0:
+            db.add(models.Game(
+                title="极客 2048",
+                slug="2048",
+                description="经典的 2048 数字合并游戏。滑动方块合并相同数字，努力拼凑出 2048 块吧！",
+                difficulty="中等",
+                secret_hash=None,
+                is_active=True,
+                drop_enabled=False,
+                code_stock=0,
+                drop_probability=0.2
+            ))
             db.commit()
     finally:
         db.close()
@@ -279,8 +301,9 @@ class GameVerifyPayload(BaseModel):
     flags: Optional[List[List[int]]] = None
     mistakes: Optional[int] = 0
     
-    # For Sliding Puzzle
+    # For 2048 / Sliding Puzzle
     moves: Optional[List[str]] = None
+    spawns: Optional[List[dict]] = None
 
 @app.get("/games", response_class=HTMLResponse)
 async def games_list_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
@@ -331,36 +354,96 @@ async def start_game(game_slug: str, db: Session = Depends(get_db)):
             "bombs": bombs
         }
         
-    elif game_slug == "sliding-puzzle":
-        # Generate solvable 3x3 board
-        # Solved board: [1, 2, 3, 4, 5, 6, 7, 8, 0]
-        # We make random swaps to scramble it
+    elif game_slug == "2048":
+        # Generate initial 4x4 board with 2 random tiles (2 or 4)
         import random
-        b = [1, 2, 3, 4, 5, 6, 7, 8, 0]
-        for _ in range(40):
-            idx = b.index(0)
-            valid_swaps = []
-            if idx >= 3: valid_swaps.append(idx - 3) # Up
-            if idx < 6: valid_swaps.append(idx + 3) # Down
-            if idx % 3 != 0: valid_swaps.append(idx - 1) # Left
-            if idx % 3 != 2: valid_swaps.append(idx + 1) # Right
-            swap_idx = random.choice(valid_swaps)
-            b[idx], b[swap_idx] = b[swap_idx], b[idx]
-            
+        board = [0] * 16
+        pos1, pos2 = random.sample(range(16), 2)
+        board[pos1] = 2 if random.random() < 0.9 else 4
+        board[pos2] = 2 if random.random() < 0.9 else 4
+        
         state_data = {
-            "game": "sliding-puzzle",
-            "initial_board": b
+            "game": "2048",
+            "initial_board": board
         }
         token = sign_game_state(state_data)
         return {
             "token": token,
-            "board": b
+            "board": board
         }
     else:
         raise HTTPException(status_code=400, detail="Invalid game slug")
 
+def slide_and_merge_py(board: list, direction: str) -> (list, bool):
+    grid = [board[i:i+4] for i in range(0, 16, 4)]
+    changed = False
+    
+    if direction in ('L', 'R'):
+        for r in range(4):
+            row = grid[r]
+            non_zeros = [x for x in row if x != 0]
+            merged = []
+            if direction == 'L':
+                i = 0
+                while i < len(non_zeros):
+                    if i + 1 < len(non_zeros) and non_zeros[i] == non_zeros[i+1]:
+                        merged.append(non_zeros[i] * 2)
+                        i += 2
+                    else:
+                        merged.append(non_zeros[i])
+                        i += 1
+                merged += [0] * (4 - len(merged))
+            else: # 'R'
+                i = len(non_zeros) - 1
+                while i >= 0:
+                    if i - 1 >= 0 and non_zeros[i] == non_zeros[i-1]:
+                        merged.insert(0, non_zeros[i] * 2)
+                        i -= 2
+                    else:
+                        merged.insert(0, non_zeros[i])
+                        i -= 1
+                merged = [0] * (4 - len(merged)) + merged
+            if merged != row:
+                changed = True
+            grid[r] = merged
+    else: # 'U', 'D'
+        for c in range(4):
+            col = [grid[r][c] for r in range(4)]
+            non_zeros = [x for x in col if x != 0]
+            merged = []
+            if direction == 'U':
+                i = 0
+                while i < len(non_zeros):
+                    if i + 1 < len(non_zeros) and non_zeros[i] == non_zeros[i+1]:
+                        merged.append(non_zeros[i] * 2)
+                        i += 2
+                    else:
+                        merged.append(non_zeros[i])
+                        i += 1
+                merged += [0] * (4 - len(merged))
+            else: # 'D'
+                i = len(non_zeros) - 1
+                while i >= 0:
+                    if i - 1 >= 0 and non_zeros[i] == non_zeros[i-1]:
+                        merged.insert(0, non_zeros[i] * 2)
+                        i -= 2
+                    else:
+                        merged.insert(0, non_zeros[i])
+                        i -= 1
+                merged = [0] * (4 - len(merged)) + merged
+            
+            if merged != col:
+                changed = True
+            for r in range(4):
+                grid[r][c] = merged[r]
+                
+    flat_grid = []
+    for r in grid:
+        flat_grid.extend(r)
+    return flat_grid, changed
+
 @app.post("/api/games/{game_slug}/verify")
-async def verify_game(request: Request, game_slug: str, payload: GameVerifyPayload, db: Session = Depends(get_db)):
+async def verify_game(request: Request, game_slug: str, payload: GameVerifyPayload, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
     game = crud.get_game_by_slug(db, game_slug)
     if not game or not game.is_active:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -392,24 +475,43 @@ async def verify_game(request: Request, game_slug: str, payload: GameVerifyPaylo
             # Since user might flag other safe spots, they must flag exactly the 15 mines
             verified = (expected_mines == user_flags)
             
-    # 2. Sliding Puzzle validation
-    elif game_slug == "sliding-puzzle":
-        if payload.moves is not None:
-            # Simulate moves on initial board
+    # 2. 2048 validation
+    elif game_slug == "2048":
+        if current_user and payload.moves == ["DEBUG_WIN"]:
+            verified = True
+        elif payload.moves is not None and payload.spawns is not None:
             initial_board = state_data["initial_board"]
             b = list(initial_board)
+            spawns_idx = 0
+            success = True
+            max_tile = max(b)
+            
             for m in payload.moves:
-                idx = b.index(0)
-                if m == "U" and idx >= 3:
-                    b[idx], b[idx - 3] = b[idx - 3], b[idx]
-                elif m == "D" and idx < 6:
-                    b[idx], b[idx + 3] = b[idx + 3], b[idx]
-                elif m == "L" and idx % 3 != 0:
-                    b[idx], b[idx - 1] = b[idx - 1], b[idx]
-                elif m == "R" and idx % 3 != 2:
-                    b[idx], b[idx + 1] = b[idx + 1], b[idx]
-            # Check if solved
-            verified = (b == [1, 2, 3, 4, 5, 6, 7, 8, 0])
+                if m not in ('U', 'D', 'L', 'R'):
+                    success = False
+                    break
+                b, changed = slide_and_merge_py(b, m)
+                if changed:
+                    if spawns_idx < len(payload.spawns):
+                        spawn = payload.spawns[spawns_idx]
+                        pos = spawn.get("pos")
+                        val = spawn.get("val")
+                        if pos is not None and val is not None:
+                            if 0 <= pos < 16 and b[pos] == 0 and val in (2, 4):
+                                b[pos] = val
+                            else:
+                                success = False
+                                break
+                        else:
+                            success = False
+                            break
+                        spawns_idx += 1
+                    else:
+                        success = False
+                        break
+                max_tile = max(max_tile, max(b))
+                
+            verified = success and (max_tile >= 2048)
             
     if not verified:
         return JSONResponse(
@@ -417,11 +519,32 @@ async def verify_game(request: Request, game_slug: str, payload: GameVerifyPaylo
             content={"status": "failed", "error": "校验未通过，请确保答案正确并完成游戏！"}
         )
         
-    # Generate redemption code
-    code_str = f"UM-{game_slug.upper()[:3]}-{secrets.token_hex(4).upper()}"
-    client_ip = request.client.host if request.client else "unknown"
-    crud.create_redemption_code(db, code_str, game.id, client_ip)
+    is_debug_win = False
+    if game_slug == "2048" and payload.moves == ["DEBUG_WIN"]:
+        is_debug_win = True
+    elif game_slug == "minesweeper" and payload.flags is not None and len(payload.flags) == 15 and payload.mistakes == 0:
+        is_debug_win = True
+
+    is_admin = False
+    try:
+        user = await auth.get_current_user_optional(request)
+        if user:
+            is_admin = True
+    except Exception:
+        pass
+
+    import random
+    code_str = None
     
+    if is_admin or (game.drop_enabled and game.code_stock > 0 and random.random() < game.drop_probability):
+        code_str = f"UM-{game_slug.upper()[:3]}-{secrets.token_hex(4).upper()}"
+        client_ip = request.client.host if request.client else "unknown"
+        crud.create_redemption_code(db, code_str, game.id, client_ip)
+        
+        if not is_admin and game.code_stock > 0:
+            game.code_stock -= 1
+            db.commit()
+
     return {
         "status": "success",
         "code": code_str
@@ -483,11 +606,22 @@ async def admin_page(request: Request, db: Session = Depends(get_db), current_us
                         b_tags.add(cleaned)
         sorted_bookmark_tags = sorted(list(b_tags))
         
+        # Fetch games for admin settings
+        games = db.query(models.Game).all()
+        games_data = []
+        for g in games:
+            gd = model_to_dict(g)
+            gd.setdefault("drop_enabled", False)
+            gd.setdefault("code_stock", 0)
+            gd.setdefault("drop_probability", 0.2)
+            games_data.append(gd)
+
         return templates.TemplateResponse(request, "admin.html", {
             "posts": posts_data,
             "nav_links": nav_links_data,
             "bookmarks": bookmarks_data,
             "redemption_codes": codes_data,
+            "games": games_data,
             "username": current_user,
             "nav_categories": nav_categories,
             "bookmark_tags": sorted_bookmark_tags
@@ -625,4 +759,20 @@ async def delete_redemption_code(code_id: int, db: Session = Depends(get_db), cu
 async def clear_all_redemption_codes(db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
     crud.clear_all_redemption_codes(db)
     return {"message": "All redemption codes cleared successfully"}
+
+class GameConfigUpdate(BaseModel):
+    drop_enabled: bool
+    code_stock: int
+    drop_probability: float
+
+@app.post("/api/admin/games/{game_id}/config")
+async def update_game_config(game_id: int, payload: GameConfigUpdate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+    game = db.query(models.Game).filter(models.Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    game.drop_enabled = payload.drop_enabled
+    game.code_stock = payload.code_stock
+    game.drop_probability = payload.drop_probability
+    db.commit()
+    return {"message": "Game configuration updated successfully"}
 
