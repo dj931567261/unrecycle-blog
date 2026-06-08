@@ -482,9 +482,6 @@
                 <button id="ms-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
                     <i class="fa-solid fa-rotate-left"></i> 重新开始
                 </button>
-                <button id="ms-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
-                </button>
             </div>
 
             <!-- RPG Rules Description Panel -->
@@ -542,9 +539,6 @@
                     <button id="g2-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
                         <i class="fa-solid fa-rotate-left"></i> 重新开始
                     </button>
-                    <button id="g2-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
-                    </button>
                 </div>
 
                 <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: center;">
@@ -593,8 +587,8 @@
                     <button id="fh-reset-btn" class="btn btn-secondary" style="padding: 10px 24px;">
                         <i class="fa-solid fa-rotate-left"></i> 重新选择英雄
                     </button>
-                    <button id="fh-test-btn" class="btn btn-secondary" style="padding: 10px 24px; border-color: var(--warning); color: var(--warning);">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> 一键测试通关 (开发用)
+                    <button id="fh-restart-btn" class="btn btn-primary" style="padding: 10px 24px;">
+                        <i class="fa-solid fa-play"></i> 重新开始
                     </button>
                 </div>
 
@@ -732,7 +726,6 @@
         const flagCountEl = document.getElementById('ms-flag-count');
         const timerEl = document.getElementById('ms-timer');
         const resetBtn = document.getElementById('ms-reset-btn');
-        const testBtn = document.getElementById('ms-test-btn');
 
         let board = [];
         let mines = [];
@@ -1174,25 +1167,7 @@
             }
         }
 
-        // Developer Debug Bypass
-        testBtn.addEventListener('click', () => {
-            if (gameOver || gameWon) return;
-            showToast("🔮 启动开发者破解模式，瞬间拆除所有地雷！", "🔮");
-            const finalFlags = [];
-            board.forEach(row => {
-                row.forEach(c => {
-                    if (c.isMine || c.isBomb) {
-                        c.isFlagged = true;
-                        c.el.classList.add('flagged');
-                        if (c.isBomb) c.el.classList.add('defused');
-                        c.el.innerHTML = `<i class="fa-solid fa-flag"></i>`;
-                        finalFlags.push([c.r, c.c]);
-                    }
-                });
-            });
-            updateHeaderUI();
-            triggerMinesweeperVictory(finalFlags);
-        });
+
 
         resetBtn.addEventListener('click', startGame);
         startGame();
@@ -1205,7 +1180,6 @@
         const scoreEl = document.getElementById('g2-score');
         const timerEl = document.getElementById('g2-timer');
         const resetBtn = document.getElementById('g2-reset-btn');
-        const testBtn = document.getElementById('g2-test-btn');
 
         let b = [];
         let movesList = [];
@@ -1501,41 +1475,7 @@
             }
         }, { passive: true });
 
-        // Admin Debug test bypass
-        testBtn.addEventListener('click', () => {
-            if (gameOver || gameWon) return;
-            showToast("🔮 发送开发一键通关请求...", "🔮");
-            
-            fetch(`/api/games/2048/verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    token: gameToken,
-                    moves: ["DEBUG_WIN"],
-                    spawns: []
-                })
-            })
-            .then(async res => {
-                const data = await res.json();
-                if (res.ok) {
-                    b = [
-                        2048, 1024, 512, 256,
-                        128, 64, 32, 16,
-                        8, 4, 2, 0,
-                        0, 0, 0, 0
-                    ];
-                    update2048UI();
-                    showVictory(data.code);
-                } else {
-                    showError("❌ " + (data.error || "校验失败！(您必须是已登录的管理员才能使用此测试按钮)"));
-                }
-            })
-            .catch(err => {
-                showError("❌ 校验服务出错，请重试！");
-            });
-        });
+
 
         resetBtn.addEventListener('click', start2048);
         start2048();
@@ -1558,7 +1498,7 @@
         const hudName = document.getElementById('fh-hud-name');
         const skillStatusEl = document.getElementById('fh-skill-status');
         const resetBtn = document.getElementById('fh-reset-btn');
-        const testBtn = document.getElementById('fh-test-btn');
+        const restartBtn = document.getElementById('fh-restart-btn');
         
         // Heroes config
         const HEROES_CONFIG = {
@@ -2232,37 +2172,8 @@
             }
         }, { passive: false });
 
-        // Admin Debug test bypass
-        testBtn.addEventListener('click', () => {
-            if (gameOver || gameWon) return;
-            showToast("🔮 发送开发一键通关请求...", "🔮");
-            
-            fetch(`/api/games/flappy-hero/verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    token: gameToken,
-                    jumps: [-999],
-                    skills: [],
-                    hero: selectedHero
-                })
-            })
-            .then(async res => {
-                const data = await res.json();
-                if (res.ok) {
-                    score = 12;
-                    scoreEl.textContent = '12 / 12';
-                    gameWon = true;
-                    showVictory(data.code);
-                } else {
-                    showError("❌ " + (data.error || "校验失败！(必须是已登录管理员且为开发模式)"));
-                }
-            })
-            .catch(err => {
-                showError("❌ 校验服务错误！");
-            });
+        restartBtn.addEventListener('click', () => {
+            initGame();
         });
 
         resetBtn.addEventListener('click', () => {
