@@ -721,6 +721,7 @@ header.site-header {
     padding: 0;
     background: transparent;
     font-size: 13px;
+    color: #e2e8f0; /* Ensure light text color inside dark code block in both themes */
 }
 
 .markdown-body blockquote {
