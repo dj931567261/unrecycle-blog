@@ -97,7 +97,7 @@ def seed_initial_data():
             db.commit()
 
         # Check and seed Games
-        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle", "sliding-puzzle"])).delete(synchronize_session=False)
+        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle", "sliding-puzzle", "flappy-hero", "thunder-hero"])).delete(synchronize_session=False)
         db.commit()
 
         # Seed Minesweeper

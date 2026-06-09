@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卦象加密解密工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-area, .output-area {
+            margin: 15px 0;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 150px;
+            font-size: 16px;
+            resize: vertical;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button#decodeBtn {
+            background-color: #2196F3;
+        }
+        button#decodeBtn:hover {
+            background-color: #0b7dda;
+        }
+        button#autoBtn {
+            background-color: #ff9800;
+        }
+        button#autoBtn:hover {
+            background-color: #e68900;
+        }
+        button#copyBtn, button#pasteBtn {
+            background-color: #9e9e9e;
+        }
+        button#copyBtn:hover, button#pasteBtn:hover {
+            background-color: #757575;
+        }
+        .status {
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            display: block;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>卦象加密解密工具</h1>
+        
+        <div class="input-area">
+            <h3>输入内容：</h3>
+            <textarea id="inputText" placeholder="请输入要加密/解密的内容..."></textarea>
+        </div>
+        
+        <div class="buttons">
+            <button id="encodeBtn">加密</button>
+            <button id="decodeBtn">解密</button>
+            <button id="autoBtn">自动判断</button>
+            <button id="pasteBtn">粘贴剪贴板</button>
+            <button id="copyBtn">复制结果</button>
+        </div>
+        
+        <div class="output-area">
+            <h3>结果：</h3>
+            <textarea id="outputText" readonly placeholder="结果将显示在这里..."></textarea>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // 卦象编码映射表
+        const ENCODE_MAP_TABLE = {
+            "A": "䷀", "B": "䷁", "C": "䷂", "D": "䷃", "E": "䷄", "F": "䷅", "G": "䷆", "H": "䷇", 
+            "I": "䷈", "J": "䷉", "K": "䷊", "L": "䷋", "M": "䷌", "N": "䷍", "O": "䷎", "P": "䷏", 
+            "Q": "䷐", "R": "䷑", "S": "䷒", "T": "䷓", "U": "䷔", "V": "䷕", "W": "䷖", "X": "䷗", 
+            "Y": "䷘", "Z": "䷙", "a": "䷚", "b": "䷛", "c": "䷜", "d": "䷝", "e": "䷞", "f": "䷟", 
+            "g": "䷠", "h": "䷡", "i": "䷢", "j": "䷣", "k": "䷤", "l": "䷥", "m": "䷦", "n": "䷧", 
+            "o": "䷨", "p": "䷩", "q": "䷪", "r": "䷫", "s": "䷬", "t": "䷭", "u": "䷮", "v": "䷯", 
+            "w": "䷰", "x": "䷱", "y": "䷲", "z": "䷳", "0": "䷴", "1": "䷵", "2": "䷶", "3": "䷷", 
+            "4": "䷸", "5": "䷹", "6": "䷺", "7": "䷻", "8": "䷼", "9": "䷽", "+": "䷾", "/": "䷿"
+        };
+
+        // 卦象解码映射表
+        const DECODE_MAP_TABLE = {
+            "䷀": "A", "䷁": "B", "䷂": "C", "䷃": "D", "䷄": "E", "䷅": "F", "䷆": "G", "䷇": "H", 
+            "䷈": "I", "䷉": "J", "䷊": "K", "䷋": "L", "䷌": "M", "䷍": "N", "䷎": "O", "䷏": "P", 
+            "䷐": "Q", "䷑": "R", "䷒": "S", "䷓": "T", "䷔": "U", "䷕": "V", "䷖": "W", "䷗": "X", 
+            "䷘": "Y", "䷙": "Z", "䷚": "a", "䷛": "b", "䷜": "c", "䷝": "d", "䷞": "e", "䷟": "f", 
+            "䷠": "g", "䷡": "h", "䷢": "i", "䷣": "j", "䷤": "k", "䷥": "l", "䷦": "m", "䷧": "n", 
+            "䷨": "o", "䷩": "p", "䷪": "q", "䷫": "r", "䷬": "s", "䷭": "t", "䷮": "u", "䷯": "v", 
+            "䷰": "w", "䷱": "x", "䷲": "y", "䷳": "z", "䷴": "0", "䷵": "1", "䷶": "2", "䷷": "3", 
+            "䷸": "4", "䷹": "5", "䷺": "6", "䷻": "7", "䷼": "8", "䷽": "9", "䷾": "+", "䷿": "/"
+        };
+
+        // Base64编码（不带填充）
+        function base64Encode(str) {
+            return btoa(unescape(encodeURIComponent(str)))
+                .replace(/=+$/, ''); // 移除填充
+        }
+
+        // Base64解码
+        function base64Decode(str) {
+            // 处理可能缺失的填充
+            const padding = 4 - (str.length % 4);
+            if (padding !== 4) {
+                str += '='.repeat(padding);
+            }
+            return decodeURIComponent(escape(atob(str)));
+        }
+
+        // 加密：将明文转换为卦象符号
+        function encodeHexagram(input) {
+            if (!input) return '';
+            
+            // 先进行Base64编码
+            const base64Str = base64Encode(input);
+            
+            // 映射为卦象符号
+            let result = '';
+            for (let i = 0; i < base64Str.length; i++) {
+                const char = base64Str.charAt(i);
+                if (ENCODE_MAP_TABLE[char]) {
+                    result += ENCODE_MAP_TABLE[char];
+                }
+            }
+            return result;
+        }
+
+        // 解密：将卦象符号转换为明文
+        function decodeHexagram(input) {
+            if (!input) return '';
+            
+            // 移除可能的格式字符
+            let processedInput = input.replace(/\n/g, '').replace(/</g, '').replace(/>/g, '');
+            
+            // 映射回Base64字符
+            let base64Str = '';
+            for (let i = 0; i < processedInput.length; i++) {
+                const char = processedInput.charAt(i);
+                if (DECODE_MAP_TABLE[char]) {
+                    base64Str += DECODE_MAP_TABLE[char];
+                }
+            }
+            
+            // 进行Base64解码
+            try {
+                return base64Decode(base64Str);
+            } catch (e) {
+                throw new Error('解密失败，无效的密文');
+            }
+        }
+
+        // 判断是否为密文（卦象符号占比超过50%）
+        function isCipherText(input) {
+            if (!input) return false;
+            
+            let cipherTextCount = 0;
+            for (let i = 0; i < input.length; i++) {
+                const char = input.charAt(i);
+                if (DECODE_MAP_TABLE[char]) {
+                    cipherTextCount++;
+                }
+            }
+            
+            return cipherTextCount > input.length / 2;
+        }
+
+        // 自动判断加密或解密
+        function autoDecodeOrEncode(input) {
+            if (!input) return '';
+            
+            if (isCipherText(input)) {
+                return decodeHexagram(input);
+            } else {
+                return encodeHexagram(input);
+            }
+        }
+
+        // 显示状态信息
+        function showStatus(message, isError = false) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status ' + (isError ? 'error' : 'success');
+            
+            // 3秒后隐藏状态信息
+            setTimeout(() => {
+                statusElement.className = 'status';
+            }, 3000);
+        }
+
+        // 初始化事件监听
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputText = document.getElementById('inputText');
+            const outputText = document.getElementById('outputText');
+            const encodeBtn = document.getElementById('encodeBtn');
+            const decodeBtn = document.getElementById('decodeBtn');
+            const autoBtn = document.getElementById('autoBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const pasteBtn = document.getElementById('pasteBtn');
+
+            // 加密按钮
+            encodeBtn.addEventListener('click', () => {
+                try {
+                    const result = encodeHexagram(inputText.value);
+                    outputText.value = result;
+                    showStatus('加密成功');
+                } catch (e) {
+                    showStatus(e.message, true);
+                }
+            });
+
+            // 解密按钮
+            decodeBtn.addEventListener('click', () => {
+                try {
+                    const result = decodeHexagram(inputText.value);
+                    outputText.value = result;
+                    showStatus('解密成功');
+                } catch (e) {
+                    showStatus(e.message, true);
+                }
+            });
+
+            // 自动判断按钮
+            autoBtn.addEventListener('click', () => {
+                try {
+                    const result = autoDecodeOrEncode(inputText.value);
+                    outputText.value = result;
+                    showStatus('操作成功');
+                } catch (e) {
+                    showStatus(e.message, true);
+                }
+            });
+
+            // 复制结果按钮
+            copyBtn.addEventListener('click', () => {
+                if (outputText.value) {
+                    navigator.clipboard.writeText(outputText.value)
+                        .then(() => showStatus('结果已复制到剪贴板'))
+                        .catch(() => showStatus('复制失败，请手动复制', true));
+                } else {
+                    showStatus('没有可复制的内容', true);
+                }
+            });
+
+            // 粘贴剪贴板按钮
+            pasteBtn.addEventListener('click', () => {
+                navigator.clipboard.readText()
+                    .then(text => {
+                        inputText.value = text;
+                        showStatus('已从剪贴板粘贴');
+                    })
+                    .catch(() => showStatus('粘贴失败，请手动粘贴', true));
+            });
+        });
+    </script>
+</body>
+</html>

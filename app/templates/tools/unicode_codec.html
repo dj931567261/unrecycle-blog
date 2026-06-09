@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}Unicode 编解码 | Unrecycle-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+        </a>
+        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🔤 Unicode 编解码</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">在本地快速实现普通文本与 Unicode 编码（如 \uXXXX、HTML 实体、Unicode 码点等）之间的双向转换。</p>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="tool-page-layout">
+        
+        <!-- Controls Toolbar -->
+        <div class="tool-header-row" style="flex-wrap: wrap; gap: 16px; justify-content: space-between;">
+            <div class="toolbar-controls" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                    <i class="fa-solid fa-lock"></i> Unicode 编码
+                </button>
+                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px; background: var(--accent-gradient);">
+                    <i class="fa-solid fa-unlock"></i> Unicode 解码
+                </button>
+                
+                <span style="color: var(--text-muted); font-size: 14px; margin: 0 4px;">|</span>
+                
+                <!-- Format Select -->
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label for="unicode-format" style="font-size: 13px; color: var(--text-secondary); margin: 0; white-space: nowrap;">格式:</label>
+                    <select id="unicode-format" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px; cursor: pointer; height: auto; border-radius: 8px;">
+                        <option value="u" selected>\uXXXX (常用)</option>
+                        <option value="u_braces">\u{X...} (ES6)</option>
+                        <option value="html_hex">&#xXXXX; (HTML 16进制)</option>
+                        <option value="html_dec">&#DDDDD; (HTML 10进制)</option>
+                        <option value="u_code_point">U+XXXX (码点列表)</option>
+                    </select>
+                </div>
+
+                <!-- Checkbox Options -->
+                <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); margin: 0; user-select: none;">
+                    <input type="checkbox" id="non-ascii-only" checked style="cursor: pointer; width: 15px; height: 15px;">
+                    仅编码非 ASCII 字符
+                </label>
+                
+                <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); margin: 0; user-select: none;">
+                    <input type="checkbox" id="uppercase-hex" checked style="cursor: pointer; width: 15px; height: 15px;">
+                    16进制大写
+                </label>
+            </div>
+            
+            <div class="toolbar-controls" style="display: flex; gap: 8px;">
+                <button id="swap-btn" class="btn btn-secondary" style="padding: 8px 12px;" title="交换输入与输出">
+                    <i class="fa-solid fa-right-left"></i> 交换
+                </button>
+                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 12px;">
+                    <i class="fa-solid fa-trash-can"></i> 清空
+                </button>
+                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 12px;">
+                    <i class="fa-solid fa-copy"></i> 复制结果
+                </button>
+            </div>
+        </div>
+
+        <!-- Input / Output workspace split -->
+        <div class="tool-workspace">
+            
+            <!-- Left panel: Raw Input -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>输入原始文本 或 编码字符串</span>
+                    <span id="char-count">0 字符</span>
+                </div>
+                <textarea id="text-input" class="tool-textarea" placeholder="在此输入需要编码的纯文本，或者输入需要解码的 Unicode 字符串 (如 \u4e2d\u6587)..." autocomplete="off" spellcheck="false"></textarea>
+            </div>
+            
+            <!-- Right panel: Highlighted Output -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>处理输出结果</span>
+                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                </div>
+                <textarea id="text-output" readonly class="tool-textarea" placeholder="处理后的结果将在此显示..."></textarea>
+            </div>
+            
+        </div>
+        
+        <!-- Validation Error Message Banner -->
+        <div id="validation-error" class="error-banner"></div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const textInput = document.getElementById('text-input');
+    const textOutput = document.getElementById('text-output');
+    const errorBanner = document.getElementById('validation-error');
+    const encodeBtn = document.getElementById('encode-btn');
+    const decodeBtn = document.getElementById('decode-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const swapBtn = document.getElementById('swap-btn');
+    const charCount = document.getElementById('char-count');
+    const codecStatus = document.getElementById('codec-status');
+    const unicodeFormat = document.getElementById('unicode-format');
+    const nonAsciiOnly = document.getElementById('non-ascii-only');
+    const uppercaseHex = document.getElementById('uppercase-hex');
+
+    // Count chars helper
+    textInput.addEventListener('input', () => {
+        charCount.textContent = `${textInput.value.length} 字符`;
+    });
+
+    // Encode logic
+    encodeBtn.addEventListener('click', () => {
+        const value = textInput.value;
+        if (!value) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+
+        try {
+            const format = unicodeFormat.value;
+            const asciiOnly = nonAsciiOnly.checked;
+            const upper = uppercaseHex.checked;
+            
+            let result = '';
+            for (let i = 0; i < value.length; i++) {
+                const codePoint = value.codePointAt(i);
+                const isAscii = codePoint < 128;
+
+                if (isAscii && asciiOnly) {
+                    result += value[i];
+                    continue;
+                }
+
+                let hex = codePoint.toString(16);
+                if (upper) hex = hex.toUpperCase();
+
+                if (format === 'u') {
+                    // \uXXXX (UTF-16)
+                    if (codePoint > 0xffff) {
+                        const high = Math.floor((codePoint - 0x10000) / 0x400) + 0xD800;
+                        const low = ((codePoint - 0x10000) % 0x400) + 0xDC00;
+                        let highHex = high.toString(16);
+                        let lowHex = low.toString(16);
+                        if (upper) {
+                            highHex = highHex.toUpperCase();
+                            lowHex = lowHex.toUpperCase();
+                        }
+                        result += '\\u' + highHex.padStart(4, '0') + '\\u' + lowHex.padStart(4, '0');
+                        i++; // Skip trail surrogate
+                    } else {
+                        result += '\\u' + hex.padStart(4, '0');
+                    }
+                } else if (format === 'u_braces') {
+                    // \u{X...} (ES6)
+                    result += '\\u{' + hex + '}';
+                    if (codePoint > 0xffff) i++;
+                } else if (format === 'html_hex') {
+                    // &#xXXXX;
+                    result += '&#x' + hex + ';';
+                    if (codePoint > 0xffff) i++;
+                } else if (format === 'html_dec') {
+                    // &#DDDDD;
+                    result += '&#' + codePoint + ';';
+                    if (codePoint > 0xffff) i++;
+                } else if (format === 'u_code_point') {
+                    // U+XXXX
+                    const padded = hex.padStart(4, '0');
+                    result += 'U+' + padded;
+                    if (codePoint > 0xffff) i++;
+                    if (i < value.length - 1) {
+                        result += ' ';
+                    }
+                }
+            }
+
+            textOutput.value = result;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '编码成功';
+            codecStatus.style.color = 'var(--success)';
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 编码失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Decode logic
+    decodeBtn.addEventListener('click', () => {
+        const value = textInput.value;
+        if (!value) {
+            textOutput.value = '';
+            errorBanner.style.display = 'none';
+            return;
+        }
+
+        try {
+            let decoded = value;
+            
+            // 1. Parse \u{X...} (ES6)
+            decoded = decoded.replace(/\\u\{([0-9a-fA-F]+)\}/g, (match, hex) => {
+                return String.fromCodePoint(parseInt(hex, 16));
+            });
+            
+            // 2. Parse standard \uXXXX
+            decoded = decoded.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
+
+            // 3. Parse &#xXXXX; (HTML Hex)
+            decoded = decoded.replace(/&#[xX]([0-9a-fA-F]+);/g, (match, hex) => {
+                return String.fromCodePoint(parseInt(hex, 16));
+            });
+
+            // 4. Parse &#DDDDD; (HTML Dec)
+            decoded = decoded.replace(/&#([0-9]+);/g, (match, dec) => {
+                return String.fromCodePoint(parseInt(dec, 10));
+            });
+
+            // 5. Parse U+XXXX or U+XXXXXX
+            decoded = decoded.replace(/U\+([0-9a-fA-F]{4,6})/gi, (match, hex) => {
+                return String.fromCodePoint(parseInt(hex, 16));
+            });
+
+            textOutput.value = decoded;
+            errorBanner.style.display = 'none';
+            codecStatus.textContent = '解码成功';
+            codecStatus.style.color = 'var(--success)';
+        } catch (err) {
+            textOutput.value = '';
+            errorBanner.textContent = `❌ 解码失败: ${err.message}`;
+            errorBanner.style.display = 'block';
+            codecStatus.textContent = '失败';
+            codecStatus.style.color = 'var(--error)';
+        }
+    });
+
+    // Swap input and output
+    swapBtn.addEventListener('click', () => {
+        const temp = textInput.value;
+        textInput.value = textOutput.value;
+        textOutput.value = temp;
+        charCount.textContent = `${textInput.value.length} 字符`;
+        codecStatus.textContent = '已交换';
+        codecStatus.style.color = 'var(--text-muted)';
+    });
+
+    // Clear
+    clearBtn.addEventListener('click', () => {
+        textInput.value = '';
+        textOutput.value = '';
+        charCount.textContent = '0 字符';
+        errorBanner.style.display = 'none';
+        codecStatus.textContent = '就绪';
+        codecStatus.style.color = 'var(--text-muted)';
+    });
+
+    // Copy to clipboard
+    copyBtn.addEventListener('click', () => {
+        const result = textOutput.value;
+        if (!result) return;
+        
+        navigator.clipboard.writeText(result).then(() => {
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> 已复制!';
+            copyBtn.style.borderColor = 'var(--success)';
+            copyBtn.style.color = 'var(--success)';
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+                copyBtn.style.borderColor = '';
+                copyBtn.style.color = '';
+            }, 1500);
+        });
+    });
+</script>
+{% endblock %}
