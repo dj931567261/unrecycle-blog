@@ -96,39 +96,10 @@ def seed_initial_data():
             db.add_all(bookmarks)
             db.commit()
 
-        # Check and seed Games
-        db.query(models.Game).filter(models.Game.slug.in_(["sudoku", "riddle", "sliding-puzzle", "flappy-hero", "thunder-hero"])).delete(synchronize_session=False)
+        # Check and seed Games (Delete all since game center is removed)
+        db.query(models.RedemptionCode).delete()
+        db.query(models.Game).delete()
         db.commit()
-
-        # Seed Minesweeper
-        if db.query(models.Game).filter(models.Game.slug == "minesweeper").count() == 0:
-            db.add(models.Game(
-                title="战损级 RPG 扫雷",
-                slug="minesweeper",
-                description="融合了 RPG 生命值与道具机制，以及心跳倒计时的定时雷扫雷挑战！避开地雷，拆除定时炸弹，测试你的反应极限！",
-                difficulty="困难",
-                secret_hash=None,
-                is_active=True,
-                drop_enabled=False,
-                code_stock=0,
-                drop_probability=0.2
-            ))
-            db.commit()
-
-        # Seed 2048
-        if db.query(models.Game).filter(models.Game.slug == "2048").count() == 0:
-            db.add(models.Game(
-                title="极客 2048",
-                slug="2048",
-                description="经典的 2048 数字合并游戏。滑动方块合并相同数字，努力拼凑出 2048 块吧！",
-                difficulty="中等",
-                secret_hash=None,
-                is_active=True,
-                drop_enabled=False,
-                code_stock=0,
-                drop_probability=0.2
-            ))
-            db.commit()
 
 
     finally:
@@ -155,8 +126,42 @@ templates = Jinja2Templates(directory="app/templates")
 def render_markdown(text: str) -> str:
     if not text:
         return ""
+    
+    # Preprocess markdown to align with marked.js behavior:
+    # 1. Normalize 2-space or 3-space list indentation to 4-space multiples
+    # 2. Ensure blank line before lists that follow paragraph text
+    import re
+    lines = text.splitlines()
+    new_lines = []
+    list_item_pattern = re.compile(r'^\s*([-*+]|\d+\.)\s+')
+    
+    for i, line in enumerate(lines):
+        # Normalize nested list indentation
+        indent_match = re.match(r'^(\s*)([-*+]|\d+\.)(\s+)(.*)', line)
+        processed_line = line
+        if indent_match:
+            spaces, bullet, post_spaces, content = indent_match.groups()
+            num_spaces = len(spaces)
+            if num_spaces > 0:
+                new_num_spaces = ((num_spaces + 2) // 4) * 4
+                if new_num_spaces == 0:
+                    new_num_spaces = 4
+                processed_line = ' ' * new_num_spaces + bullet + post_spaces + content
+        
+        # Insert blank line if current line is a list item and previous line is non-empty/non-list
+        if i > 0:
+            prev_line = lines[i-1].strip()
+            if list_item_pattern.match(processed_line) and prev_line:
+                # Check that prev_line is not already a list item or other common block markers
+                if not list_item_pattern.match(prev_line) and not prev_line.startswith(('#', '>', '`', '- ', '* ', '+ ')):
+                    new_lines.append("")
+                    
+        new_lines.append(processed_line)
+        
+    preprocessed_text = "\n".join(new_lines)
+    
     # Extensions: fenced_code (code blocks), tables, toc (table of contents)
-    return markdown.markdown(text, extensions=['fenced_code', 'tables', 'toc', 'nl2br'])
+    return markdown.markdown(preprocessed_text, extensions=['fenced_code', 'tables', 'toc', 'nl2br'])
 
 # Add markdown filter to Jinja2
 templates.env.filters["markdown"] = render_markdown
@@ -267,293 +272,7 @@ async def render_tool(request: Request, tool_name: str, current_user: Optional[s
     except Exception:
         raise HTTPException(status_code=404, detail="Tool not found")
 
-# --- Game Center Routes ---
-import hmac
-import hashlib
-import json
-import base64
-import secrets
 
-GAME_SECRET_KEY = b"unrecycle_rpg_minesweeper_secret"
-
-def sign_game_state(data: dict) -> str:
-    json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
-    sig = hmac.new(GAME_SECRET_KEY, json_bytes, hashlib.sha256).hexdigest()
-    payload = {"data": data, "sig": sig}
-    return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
-
-def verify_game_state(payload_str: str) -> Optional[dict]:
-    try:
-        payload = json.loads(base64.b64decode(payload_str.encode("utf-8")).decode("utf-8"))
-        data = payload["data"]
-        sig = payload["sig"]
-        json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
-        expected_sig = hmac.new(GAME_SECRET_KEY, json_bytes, hashlib.sha256).hexdigest()
-        if hmac.compare_digest(sig, expected_sig):
-            return data
-    except Exception:
-        pass
-    return None
-
-class GameVerifyPayload(BaseModel):
-    # Common
-    token: str
-    
-    # For Minesweeper
-    flags: Optional[List[List[int]]] = None
-    mistakes: Optional[int] = 0
-    
-    # For 2048 / Sliding Puzzle
-    moves: Optional[List[str]] = None
-    spawns: Optional[List[dict]] = None
-
-@app.get("/games", response_class=HTMLResponse)
-async def games_list_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    games = crud.get_games(db, active_only=True)
-    return templates.TemplateResponse(request, "games_list.html", {
-        "games": games,
-        "is_admin": current_user is not None
-    })
-
-@app.get("/games/{game_slug}", response_class=HTMLResponse)
-async def game_detail_page(request: Request, game_slug: str, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    game = crud.get_game_by_slug(db, game_slug)
-    if not game or not game.is_active:
-        raise HTTPException(status_code=404, detail="Game not found")
-    return templates.TemplateResponse(request, "game_detail.html", {
-        "game": game,
-        "is_admin": current_user is not None
-    })
-
-# API to Start / Scramble the game and return signed state
-@app.get("/api/games/{game_slug}/start")
-async def start_game(game_slug: str, db: Session = Depends(get_db)):
-    game = crud.get_game_by_slug(db, game_slug)
-    if not game or not game.is_active:
-        raise HTTPException(status_code=404, detail="Game not found")
-        
-    if game_slug == "minesweeper":
-        # Generate 10x10 board with 15 mines (12 regular, 3 bombs)
-        import random
-        all_cells = [(r, c) for r in range(10) for c in range(10)]
-        mine_cells = random.sample(all_cells, 15)
-        
-        # 3 time-bombs, 12 regular mines
-        bombs = mine_cells[:3]
-        mines = mine_cells[3:]
-        
-        state_data = {
-            "game": "minesweeper",
-            "bombs": bombs,
-            "mines": mines
-        }
-        token = sign_game_state(state_data)
-        
-        # We only return the Time-Bomb positions to the client (so it can flash them)
-        # We do NOT return regular mine positions (these are hidden in the token)
-        return {
-            "token": token,
-            "bombs": bombs
-        }
-        
-    elif game_slug == "2048":
-        # Generate initial 4x4 board with 2 random tiles (2 or 4)
-        import random
-        board = [0] * 16
-        pos1, pos2 = random.sample(range(16), 2)
-        board[pos1] = 2 if random.random() < 0.9 else 4
-        board[pos2] = 2 if random.random() < 0.9 else 4
-        
-        state_data = {
-            "game": "2048",
-            "initial_board": board
-        }
-        token = sign_game_state(state_data)
-        return {
-            "token": token,
-            "board": board
-        }
-    elif game_slug == "flappy-hero" or game_slug == "thunder-hero":
-        raise HTTPException(status_code=404, detail="Game not found")
-    else:
-        raise HTTPException(status_code=400, detail="Invalid game slug")
-
-def slide_and_merge_py(board: list, direction: str) -> (list, bool):
-    grid = [board[i:i+4] for i in range(0, 16, 4)]
-    changed = False
-    
-    if direction in ('L', 'R'):
-        for r in range(4):
-            row = grid[r]
-            non_zeros = [x for x in row if x != 0]
-            merged = []
-            if direction == 'L':
-                i = 0
-                while i < len(non_zeros):
-                    if i + 1 < len(non_zeros) and non_zeros[i] == non_zeros[i+1]:
-                        merged.append(non_zeros[i] * 2)
-                        i += 2
-                    else:
-                        merged.append(non_zeros[i])
-                        i += 1
-                merged += [0] * (4 - len(merged))
-            else: # 'R'
-                i = len(non_zeros) - 1
-                while i >= 0:
-                    if i - 1 >= 0 and non_zeros[i] == non_zeros[i-1]:
-                        merged.insert(0, non_zeros[i] * 2)
-                        i -= 2
-                    else:
-                        merged.insert(0, non_zeros[i])
-                        i -= 1
-                merged = [0] * (4 - len(merged)) + merged
-            if merged != row:
-                changed = True
-            grid[r] = merged
-    else: # 'U', 'D'
-        for c in range(4):
-            col = [grid[r][c] for r in range(4)]
-            non_zeros = [x for x in col if x != 0]
-            merged = []
-            if direction == 'U':
-                i = 0
-                while i < len(non_zeros):
-                    if i + 1 < len(non_zeros) and non_zeros[i] == non_zeros[i+1]:
-                        merged.append(non_zeros[i] * 2)
-                        i += 2
-                    else:
-                        merged.append(non_zeros[i])
-                        i += 1
-                merged += [0] * (4 - len(merged))
-            else: # 'D'
-                i = len(non_zeros) - 1
-                while i >= 0:
-                    if i - 1 >= 0 and non_zeros[i] == non_zeros[i-1]:
-                        merged.insert(0, non_zeros[i] * 2)
-                        i -= 2
-                    else:
-                        merged.insert(0, non_zeros[i])
-                        i -= 1
-                merged = [0] * (4 - len(merged)) + merged
-            
-            if merged != col:
-                changed = True
-            for r in range(4):
-                grid[r][c] = merged[r]
-                
-    flat_grid = []
-    for r in grid:
-        flat_grid.extend(r)
-    return flat_grid, changed
-
-@app.post("/api/games/{game_slug}/verify")
-async def verify_game(request: Request, game_slug: str, payload: GameVerifyPayload, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    game = crud.get_game_by_slug(db, game_slug)
-    if not game or not game.is_active:
-        raise HTTPException(status_code=404, detail="Game not found")
-        
-    # Verify signature token
-    state_data = verify_game_state(payload.token)
-    if not state_data or state_data.get("game") != game_slug:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"status": "failed", "error": "无效的游戏校验数据，请重新开始游戏！"}
-        )
-        
-    verified = False
-    
-    # 1. Minesweeper validation
-    if game_slug == "minesweeper":
-        if payload.flags is not None and payload.mistakes is not None:
-            # Check that mistakes are under 3
-            if payload.mistakes >= 3:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={"status": "failed", "error": "生命值已耗尽，挑战失败！"}
-                )
-            # Check that flags match mines exactly
-            # Mines are: bombs + mines
-            expected_mines = set((m[0], m[1]) for m in state_data["mines"]) | set((b[0], b[1]) for b in state_data["bombs"])
-            user_flags = set((f[0], f[1]) for f in payload.flags)
-            
-            # Since user might flag other safe spots, they must flag exactly the 15 mines
-            verified = (expected_mines == user_flags)
-            
-    # 2. 2048 validation
-    elif game_slug == "2048":
-        if current_user and payload.moves == ["DEBUG_WIN"]:
-            verified = True
-        elif payload.moves is not None and payload.spawns is not None:
-            initial_board = state_data["initial_board"]
-            b = list(initial_board)
-            spawns_idx = 0
-            success = True
-            max_tile = max(b)
-            
-            for m in payload.moves:
-                if m not in ('U', 'D', 'L', 'R'):
-                    success = False
-                    break
-                b, changed = slide_and_merge_py(b, m)
-                if changed:
-                    if spawns_idx < len(payload.spawns):
-                        spawn = payload.spawns[spawns_idx]
-                        pos = spawn.get("pos")
-                        val = spawn.get("val")
-                        if pos is not None and val is not None:
-                            if 0 <= pos < 16 and b[pos] == 0 and val in (2, 4):
-                                b[pos] = val
-                            else:
-                                success = False
-                                break
-                        else:
-                            success = False
-                            break
-                        spawns_idx += 1
-                    else:
-                        success = False
-                        break
-                max_tile = max(max_tile, max(b))
-                
-            verified = success and (max_tile >= 2048)
-
-    if not verified:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"status": "failed", "error": "校验未通过，请确保答案正确并完成游戏！"}
-        )
-        
-    is_debug_win = False
-    if game_slug == "2048" and payload.moves == ["DEBUG_WIN"]:
-        is_debug_win = True
-    elif game_slug == "minesweeper" and payload.flags is not None and len(payload.flags) == 15 and payload.mistakes == 0:
-        is_debug_win = True
-
-
-    is_admin = False
-    try:
-        user = await auth.get_current_user_optional(request)
-        if user:
-            is_admin = True
-    except Exception:
-        pass
-
-    import random
-    code_str = None
-    
-    if is_admin or (game.drop_enabled and game.code_stock > 0 and random.random() < game.drop_probability):
-        code_str = f"UM-{game_slug.upper()[:3]}-{secrets.token_hex(4).upper()}"
-        client_ip = request.client.host if request.client else "unknown"
-        crud.create_redemption_code(db, code_str, game.id, client_ip)
-        
-        if not is_admin and game.code_stock > 0:
-            game.code_stock -= 1
-            db.commit()
-
-    return {
-        "status": "success",
-        "code": code_str
-    }
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, current_user: Optional[str] = Depends(auth.get_current_user_optional)):
@@ -589,13 +308,6 @@ async def admin_page(request: Request, db: Session = Depends(get_db), current_us
         nav_links_data = [model_to_dict(n) for n in nav_links]
         bookmarks_data = [model_to_dict(b) for b in bookmarks]
         
-        redemption_codes = crud.get_redemption_codes(db, limit=100)
-        codes_data = []
-        for rc in redemption_codes:
-            d = model_to_dict(rc)
-            d["game_title"] = rc.game.title if rc.game else "未知游戏"
-            codes_data.append(d)
-        
         # Get unique navigation categories with common defaults
         default_categories = ["常用网址", "技术文档", "开发工具", "设计资源"]
         existing_categories = [n.category for n in nav_links if n.category]
@@ -610,23 +322,13 @@ async def admin_page(request: Request, db: Session = Depends(get_db), current_us
                     if cleaned:
                         b_tags.add(cleaned)
         sorted_bookmark_tags = sorted(list(b_tags))
-        
-        # Fetch games for admin settings
-        games = db.query(models.Game).all()
-        games_data = []
-        for g in games:
-            gd = model_to_dict(g)
-            gd.setdefault("drop_enabled", False)
-            gd.setdefault("code_stock", 0)
-            gd.setdefault("drop_probability", 0.2)
-            games_data.append(gd)
 
         return templates.TemplateResponse(request, "admin.html", {
             "posts": posts_data,
             "nav_links": nav_links_data,
             "bookmarks": bookmarks_data,
-            "redemption_codes": codes_data,
-            "games": games_data,
+            "redemption_codes": [],
+            "games": [],
             "username": current_user,
             "nav_categories": nav_categories,
             "bookmark_tags": sorted_bookmark_tags
@@ -752,32 +454,5 @@ async def upload_file(file: UploadFile = File(...), current_user: str = Depends(
     return {"url": f"/static/uploads/{filename}"}
 
 
-# Redemption Code Admin APIs
-@app.delete("/api/codes/{code_id}")
-async def delete_redemption_code(code_id: int, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    success = crud.delete_redemption_code(db, code_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Redemption code not found")
-    return {"message": "Redemption code deleted successfully"}
 
-@app.delete("/api/codes")
-async def clear_all_redemption_codes(db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    crud.clear_all_redemption_codes(db)
-    return {"message": "All redemption codes cleared successfully"}
-
-class GameConfigUpdate(BaseModel):
-    drop_enabled: bool
-    code_stock: int
-    drop_probability: float
-
-@app.post("/api/admin/games/{game_id}/config")
-async def update_game_config(game_id: int, payload: GameConfigUpdate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    game = db.query(models.Game).filter(models.Game.id == game_id).first()
-    if not game:
-        raise HTTPException(status_code=404, detail="Game not found")
-    game.drop_enabled = payload.drop_enabled
-    game.code_stock = payload.code_stock
-    game.drop_probability = payload.drop_probability
-    db.commit()
-    return {"message": "Game configuration updated successfully"}
 

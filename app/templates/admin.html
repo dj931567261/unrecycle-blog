@@ -46,9 +46,7 @@
             <button class="admin-tab-btn" onclick="switchTab('bookmarks-tab', this)">
                 <i class="fa-solid fa-bookmark" style="margin-right: 6px;"></i> 灵感书签管理
             </button>
-            <button class="admin-tab-btn" onclick="switchTab('codes-tab', this)">
-                <i class="fa-solid fa-gift" style="margin-right: 6px;"></i> 游戏兑换码记录
-            </button>
+
         </div>
 
         <!-- TAB 1: POSTS -->
@@ -209,84 +207,7 @@
             </div>
         </div>
 
-        <!-- TAB 4: REDEMPTION CODES -->
-        <div id="codes-tab" class="admin-tab-content">
-            <!-- Game settings config panel -->
-            <div class="glass-card" style="padding: 20px; margin-bottom: 24px;">
-                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-sliders" style="color: var(--accent-blue);"></i> 🎯 游戏通关掉落奖励配置
-                </h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-                    {% for game in games %}
-                    <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px;">
-                        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">
-                            {% if game.slug == 'minesweeper' %}💣{% else %}🔢{% endif %} {{ game.title }}
-                        </h4>
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <label style="font-size: 13px; color: var(--text-secondary); cursor: pointer;" for="game-drop-{{ game.id }}">开启掉落奖励：</label>
-                            <input type="checkbox" id="game-drop-{{ game.id }}" {% if game.drop_enabled %}checked{% endif %} style="cursor: pointer; width: 18px; height: 18px;">
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                            <label style="font-size: 13px; color: var(--text-secondary);">剩余库存 (个)：</label>
-                            <input type="number" id="game-stock-{{ game.id }}" value="{{ game.code_stock }}" min="0" class="search-input" style="width: 80px; padding: 4px 8px; text-align: center;">
-                        </div>
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                            <label style="font-size: 13px; color: var(--text-secondary);">掉落概率 (%)：</label>
-                            <input type="number" id="game-prob-{{ game.id }}" value="{{ (game.drop_probability * 100) | int }}" min="0" max="100" class="search-input" style="width: 80px; padding: 4px 8px; text-align: center;">
-                        </div>
-                        <button class="btn btn-primary" onclick="saveGameConfig({{ game.id }})" style="padding: 6px 12px; font-size: 12px; margin-top: 8px;">
-                            <i class="fa-solid fa-floppy-disk"></i> 保存设置
-                        </button>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
 
-            <div class="action-row" style="margin-bottom: 20px;">
-                <button class="btn btn-danger" onclick="clearAllCodes()"><i class="fa-solid fa-trash-can"></i> 清空所有兑换码记录</button>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>兑换码</th>
-                            <th>来源游戏</th>
-                            <th>获取 IP 地址</th>
-                            <th>生成时间</th>
-                            <th>状态</th>
-                            <th style="text-align: right;">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if redemption_codes %}
-                            {% for code in redemption_codes %}
-                                <tr id="code-row-{{ code.id }}">
-                                    <td style="font-family: var(--font-mono); font-weight: 700; font-size: 15px; color: var(--success);">{{ code.code }}</td>
-                                    <td style="font-weight: 600;">{{ code.game_title }}</td>
-                                    <td><code>{{ code.ip_address or 'unknown' }}</code></td>
-                                    <td>{{ code.created_at | datetime }}</td>
-                                    <td>
-                                        <span class="history-badge {% if code.status == 'unused' %}encode{% else %}decode{% endif %}" style="font-size: 11px;">
-                                            {% if code.status == 'unused' %}未使用{% else %}已核销{% endif %}
-                                        </span>
-                                    </td>
-                                    <td style="text-align: right;">
-                                        <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;" 
-                                                onclick="deleteCode({{ code.id }})">
-                                            <i class="fa-solid fa-trash"></i> 删除
-                                        </button>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">暂无任何通关兑换码生成记录。</td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
     </div>
 
@@ -516,11 +437,63 @@
         postSlug.value = slug;
     }
 
+    // Preprocess markdown to align with backend behavior:
+    // 1. Normalize 2-space or 3-space list indentation to 4-space multiples
+    // 2. Ensure blank line before lists that follow paragraph text
+    function preprocessMarkdown(text) {
+        if (!text) return "";
+        const lines = text.split(/\r?\n/);
+        const newLines = [];
+        const listItemPattern = /^\s*([-*+]|\d+\.)\s+/;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            let processedLine = line;
+            
+            // Normalize nested list indentation
+            const indentMatch = line.match(/^(\s*)([-*+]|\d+\.)(\s+)(.*)/);
+            if (indentMatch) {
+                const spaces = indentMatch[1];
+                const bullet = indentMatch[2];
+                const postSpaces = indentMatch[3];
+                const content = indentMatch[4];
+                const numSpaces = spaces.length;
+                if (numSpaces > 0) {
+                    let newNumSpaces = Math.floor((numSpaces + 2) / 4) * 4;
+                    if (newNumSpaces === 0) {
+                        newNumSpaces = 4;
+                    }
+                    processedLine = " ".repeat(newNumSpaces) + bullet + postSpaces + content;
+                }
+            }
+            
+            // Insert blank line if current line is a list item and previous line is non-empty/non-list
+            if (i > 0) {
+                const prevLine = lines[i - 1].trim();
+                if (listItemPattern.test(processedLine) && prevLine) {
+                    // Check that prevLine is not already a list item or other common block markers
+                    if (!listItemPattern.test(prevLine) && 
+                        !prevLine.startsWith('#') && 
+                        !prevLine.startsWith('>') && 
+                        !prevLine.startsWith('`') && 
+                        !prevLine.startsWith('- ') && 
+                        !prevLine.startsWith('* ') && 
+                        !prevLine.startsWith('+ ')) {
+                        newLines.push("");
+                    }
+                }
+            }
+            
+            newLines.push(processedLine);
+        }
+        return newLines.join("\n");
+    }
+
     // Realtime Markdown Preview
     function updateEditorPreview() {
         const rawContent = postContent.value;
         if (rawContent && window.marked) {
-            postPreview.innerHTML = marked.parse(rawContent);
+            postPreview.innerHTML = marked.parse(preprocessMarkdown(rawContent));
         } else {
             postPreview.innerHTML = '<span class="text-muted" style="font-style: italic;">实时预览区域...</span>';
         }
@@ -873,61 +846,6 @@
         }
     }
 
-    async function deleteCode(codeId) {
-        if (!confirm('确定要删除这个兑换码记录吗？')) return;
-        try {
-            const response = await fetch(`/api/codes/${codeId}`, { method: 'DELETE' });
-            if (response.ok) {
-                document.getElementById(`code-row-${codeId}`).remove();
-            } else {
-                alert('删除失败');
-            }
-        } catch (err) {
-            alert('网络异常');
-        }
-    }
 
-    async function clearAllCodes() {
-        if (!confirm('确定要清空所有兑换码记录吗？此操作不可逆！')) return;
-        try {
-            const response = await fetch('/api/codes', { method: 'DELETE' });
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                alert('清空失败');
-            }
-        } catch (err) {
-            alert('网络异常');
-        }
-    }
-
-    async function saveGameConfig(gameId) {
-        const dropEnabled = document.getElementById(`game-drop-${gameId}`).checked;
-        const codeStock = parseInt(document.getElementById(`game-stock-${gameId}`).value) || 0;
-        const probVal = parseInt(document.getElementById(`game-prob-${gameId}`).value) || 0;
-        const dropProbability = parseFloat(probVal / 100).toFixed(2);
-        
-        try {
-            const response = await fetch(`/api/admin/games/${gameId}/config`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    drop_enabled: dropEnabled,
-                    code_stock: codeStock,
-                    drop_probability: parseFloat(dropProbability)
-                })
-            });
-            if (response.ok) {
-                alert('游戏奖励配置已成功保存！');
-            } else {
-                const data = await response.json();
-                alert('保存失败: ' + (data.detail || '未知错误'));
-            }
-        } catch (err) {
-            alert('网络异常');
-        }
-    }
 </script>
 {% endblock %}
