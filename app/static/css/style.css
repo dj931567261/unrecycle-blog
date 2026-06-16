@@ -705,6 +705,16 @@ header.site-header {
     overflow-x: auto;
     border: 1px solid var(--border-color);
     margin: 24px 0;
+    max-width: 100%;
+    word-wrap: normal;
+}
+
+.code-block-wrapper {
+    margin: 24px 0;
+}
+
+.code-block-wrapper pre {
+    margin: 0;
 }
 
 .markdown-body code {
@@ -1098,7 +1108,7 @@ footer.site-footer {
 /* Markdown preview split editor in Modal */
 .md-editor-split {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 16px;
     height: 400px;
 }
@@ -1158,8 +1168,8 @@ footer.site-footer {
         gap: 16px;
     }
     .md-editor-split {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
         height: 600px;
     }
 }

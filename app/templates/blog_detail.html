@@ -100,7 +100,7 @@
 
         .blog-detail-layout {
             display: grid;
-            grid-template-columns: 250px 1fr;
+            grid-template-columns: 250px minmax(0, 1fr);
             gap: 40px;
             align-items: start;
             margin-top: 24px;
@@ -190,7 +190,7 @@
                 max-width: 800px !important;
             }
             .blog-detail-layout {
-                grid-template-columns: 1fr;
+                grid-template-columns: minmax(0, 1fr);
             }
             .blog-sidebar {
                 display: none;
@@ -267,7 +267,14 @@
     window.addEventListener('DOMContentLoaded', () => {
         const codeBlocks = document.querySelectorAll('.markdown-body pre');
         codeBlocks.forEach(block => {
-            block.style.position = 'relative';
+            // Create container wrapper for code block and action buttons
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-block-wrapper';
+            wrapper.style.position = 'relative';
+            
+            // Insert wrapper and nest block inside
+            block.parentNode.insertBefore(wrapper, block);
+            wrapper.appendChild(block);
             
             const button = document.createElement('button');
             button.className = 'btn-icon';
@@ -281,16 +288,13 @@
             button.style.borderColor = 'rgba(255, 255, 255, 0.1)';
             button.innerHTML = '<i class="fa-regular fa-copy"></i>';
             button.title = '复制代码';
+            button.style.zIndex = '10';
             
-            block.appendChild(button);
+            wrapper.appendChild(button);
             
             button.addEventListener('click', () => {
                 const code = block.querySelector('code');
                 let codeText = code ? code.innerText : block.innerText;
-                
-                if (codeText.endsWith('复制代码')) {
-                    codeText = codeText.slice(0, -4);
-                }
                 
                 navigator.clipboard.writeText(codeText).then(() => {
                     button.innerHTML = '<i class="fa-solid fa-check" style="color: var(--success);"></i>';
