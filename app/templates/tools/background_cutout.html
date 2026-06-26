@@ -1,0 +1,717 @@
+{% extends "base.html" %}
+
+{% block title %}智能吸色抠图 | Unrecycle-Me{% endblock %}
+
+{% block content %}
+
+    <div style="margin-top: 10px; margin-bottom: 20px;">
+        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+        </a>
+        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🎨 智能吸色抠图</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">在本地纯客户端对图片进行吸色和扣除背景，支持容差调节并导出 PNG/WebP 透明图。</p>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="tool-page-layout">
+        
+        <!-- Input / Output workspace split -->
+        <div class="tool-workspace">
+            
+            <!-- Left panel: Controls -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>配置与控制</span>
+                    <span style="color: var(--text-muted);"><i class="fa-solid fa-sliders"></i> 参数</span>
+                </div>
+                <div class="control-panel-body">
+                    
+                    <!-- 1. Upload Section -->
+                    <div id="drop-zone" class="upload-drop-zone">
+                        <i class="fa-solid fa-cloud-arrow-up" style="font-size: 32px; margin-bottom: 12px; color: var(--accent-blue);"></i>
+                        <div class="upload-title">拖拽图片到这里 或 <span class="upload-link">点击上传</span></div>
+                        <div class="upload-hint">支持 PNG, JPG, JPEG, WEBP 格式</div>
+                        <input type="file" id="upload-input" accept="image/*" style="display: none;" />
+                    </div>
+                    
+                    <!-- 2. Target Color Section -->
+                    <div class="control-group-title">1. 背景吸色</div>
+                    <button id="picker-btn" class="btn btn-secondary" style="width: 100%; margin-bottom: 12px; height: 42px;" disabled>
+                        <i class="fa-solid fa-eye-dropper"></i> 点击开始吸色
+                    </button>
+                    
+                    <div class="color-display-row">
+                        <div id="color-box" class="color-box"></div>
+                        <div class="color-text-details">
+                            <div id="color-val-rgb" class="color-val">RGB: (0, 0, 0)</div>
+                            <div id="color-val-hex" class="color-val">HEX: #000000</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 3. Tolerance Slider -->
+                    <div class="control-group-title" style="margin-top: 20px;">2. 相似容差</div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span>颜色匹配范围</span>
+                            <span id="thresh-val" class="slider-val-badge">30</span>
+                        </div>
+                        <input type="range" id="threshold" min="0" max="200" value="30" class="custom-range" disabled />
+                        <div class="slider-desc">容差越大，匹配并去除的背景范围越广；容差越小则越精准。</div>
+                    </div>
+                    
+                    <!-- 4. Export Format Selector -->
+                    <div class="control-group-title" style="margin-top: 24px;">3. 导出设置</div>
+                    <div style="margin-bottom: 16px;">
+                        <select id="format-select" class="tool-select" style="width: 100%; height: 42px;" disabled>
+                            <option value="image/png">PNG格式 (支持透明度)</option>
+                            <option value="image/webp">WebP格式 (高清省空间)</option>
+                            <option value="image/jpeg">JPEG格式 (无透明，白色背景)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 5. Download Button -->
+                    <button id="download-btn" class="btn btn-primary" style="width: 100%; height: 44px; margin-top: 8px;" disabled>
+                        <i class="fa-solid fa-download"></i> 导出并保存图片
+                    </button>
+                    
+                </div>
+            </div>
+            
+            <!-- Right panel: Canvas Preview -->
+            <div class="panel-container">
+                <div class="panel-title-bar">
+                    <span>处理预览区</span>
+                    <span id="image-dimensions" style="color: var(--text-muted);">暂无图片</span>
+                </div>
+                
+                <div class="preview-canvas-container checkerboard-bg" id="preview-container">
+                    
+                    <!-- Image Placeholder -->
+                    <div id="placeholder" class="placeholder-msg">
+                        <i class="fa-regular fa-image" style="font-size: 48px; color: var(--text-muted); margin-bottom: 16px;"></i>
+                        <div>请上传一张图片</div>
+                        <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">然后在左侧面板吸取您想要去掉的背景颜色</div>
+                    </div>
+                    
+                    <!-- Main Canvas -->
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    
+                    <!-- Pixel Magnifier Zoom Lens -->
+                    <div id="magnifier" class="pixel-magnifier">
+                        <canvas id="magnifier-canvas" width="130" height="130"></canvas>
+                        <div id="magnifier-val">#000000</div>
+                    </div>
+                    
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Layout & Panels */
+    .control-panel-body {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+        padding: 20px;
+        color: var(--text-primary);
+        height: 100%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .control-group-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Upload Drop Zone */
+    .upload-drop-zone {
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 24px 16px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.01);
+        cursor: pointer;
+        transition: var(--transition-smooth);
+        margin-bottom: 20px;
+        will-change: transform;
+    }
+    .upload-drop-zone:hover, .upload-drop-zone.dragover {
+        border-color: var(--accent-blue);
+        background: var(--bg-input-focus);
+        transform: scale(0.99);
+    }
+    
+    html[data-theme="light"] .upload-drop-zone {
+        background: rgba(0, 0, 0, 0.01);
+    }
+    html[data-theme="light"] .upload-drop-zone:hover, html[data-theme="light"] .upload-drop-zone.dragover {
+        background: rgba(15, 23, 42, 0.03);
+    }
+    
+    .upload-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: var(--text-primary);
+    }
+    .upload-link {
+        color: var(--accent-blue);
+        text-decoration: underline;
+        font-weight: 700;
+    }
+    .upload-hint {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    
+    /* Color Swatch Display */
+    .color-display-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        padding: 12px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        transition: background-color 0.3s ease;
+    }
+    .color-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        border: 2px solid var(--border-color);
+        background-color: #000000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transition: background-color 0.1s ease;
+    }
+    .color-text-details {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .color-val {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    
+    /* Custom Slider Styles */
+    .slider-container {
+        background: var(--bg-input);
+        border: 1px solid var(--border-color);
+        padding: 12px 14px;
+        border-radius: 10px;
+    }
+    .slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    .slider-val-badge {
+        background: var(--bg-btn-hover);
+        border: 1px solid var(--border-color);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent-blue);
+    }
+    .custom-range {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        outline: none;
+        background: var(--border-color);
+        accent-color: var(--accent-blue);
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .custom-range:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .slider-desc {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 6px;
+        line-height: 1.4;
+    }
+    
+    /* Preview Canvas Area */
+    .preview-canvas-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        min-height: 400px;
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Interactive Checkerboard Pattern */
+    .checkerboard-bg {
+        background-color: var(--bg-base);
+        background-image:
+            linear-gradient(45deg, var(--border-color) 25%, transparent 25%),
+            linear-gradient(-45deg, var(--border-color) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, var(--border-color) 75%),
+            linear-gradient(-45deg, transparent 75%, var(--border-color) 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+    
+    .placeholder-msg {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        font-size: 15px;
+        text-align: center;
+        padding: 40px;
+    }
+    
+    canvas {
+        max-width: 95%;
+        max-height: 90%;
+        object-fit: contain;
+        border-radius: 6px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        cursor: default;
+    }
+    
+    canvas.cursor-crosshair {
+        cursor: crosshair !important;
+    }
+    
+    /* Pixel Magnifier Circle Box */
+    .pixel-magnifier {
+        width: 130px;
+        height: 155px;
+        border-radius: 12px;
+        border: 2px solid var(--accent-blue);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+        position: absolute;
+        display: none;
+        overflow: hidden;
+        z-index: 100;
+        background: var(--bg-surface-solid);
+        transition: transform 0.05s ease-out;
+    }
+    
+    #magnifier-val {
+        background: rgba(0, 0, 0, 0.85);
+        color: #fff;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        text-align: center;
+        padding: 4px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+        height: 25px;
+        line-height: 17px;
+    }
+    
+    /* Active Picker Button Styling */
+    .picker-active-btn {
+        background: #f59e0b !important;
+        border-color: #f59e0b !important;
+        color: #000000 !important;
+        font-weight: 700 !important;
+        animation: pickerPulse 1.5s infinite;
+    }
+    @keyframes pickerPulse {
+        0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+        70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+    
+    /* Responsive Adaptations */
+    @media (max-width: 900px) {
+        .tool-workspace {
+            grid-template-columns: 1fr !important;
+            height: auto !important;
+        }
+        .tool-page-layout {
+            height: auto !important;
+        }
+        .control-panel-body {
+            height: auto !important;
+        }
+        .preview-canvas-container {
+            height: 480px !important;
+        }
+    }
+</style>
+
+<script>
+    // Elements
+    const dropZone = document.getElementById("drop-zone");
+    const uploadInput = document.getElementById("upload-input");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    
+    const previewContainer = document.getElementById("preview-container");
+    const placeholder = document.getElementById("placeholder");
+    const imageDimensions = document.getElementById("image-dimensions");
+    
+    const pickerBtn = document.getElementById("picker-btn");
+    const colorBox = document.getElementById("color-box");
+    const colorValRgb = document.getElementById("color-val-rgb");
+    const colorValHex = document.getElementById("color-val-hex");
+    
+    const thresholdInput = document.getElementById("threshold");
+    const threshValDisplay = document.getElementById("thresh-val");
+    const formatSelect = document.getElementById("format-select");
+    const downloadBtn = document.getElementById("download-btn");
+    
+    const magnifier = document.getElementById("magnifier");
+    const magnifierCanvas = document.getElementById("magnifier-canvas");
+    const magnifierVal = document.getElementById("magnifier-val");
+    
+    // States
+    let originalImage = null;
+    let isImageLoaded = false;
+    let isPickingMode = false;
+    let targetColor = { r: 0, g: 0, b: 0 };
+    
+    // Offscreen Canvas for original pixels
+    let offscreenCanvas = null;
+    let offscreenCtx = null;
+    
+    // 1. Upload Logic (Click and Drag/Drop)
+    dropZone.addEventListener("click", () => {
+        uploadInput.click();
+    });
+    
+    uploadInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        handleFile(file);
+    });
+    
+    // Drag & Drop event bindings
+    ["dragenter", "dragover"].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add("dragover");
+        }, false);
+    });
+    
+    ["dragleave", "drop"].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("dragover");
+        }, false);
+    });
+    
+    dropZone.addEventListener("drop", (e) => {
+        const dt = e.dataTransfer;
+        const file = dt.files[0];
+        handleFile(file);
+    });
+    
+    function handleFile(file) {
+        if (!file || !file.type.match("image.*")) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            originalImage = new Image();
+            originalImage.onload = () => {
+                initCanvas();
+            };
+            originalImage.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    function initCanvas() {
+        isImageLoaded = true;
+        placeholder.style.display = "none";
+        canvas.style.display = "block";
+        
+        // Enable fields
+        pickerBtn.disabled = false;
+        thresholdInput.disabled = false;
+        formatSelect.disabled = false;
+        downloadBtn.disabled = false;
+        
+        // Setup Sizes
+        canvas.width = originalImage.width;
+        canvas.height = originalImage.height;
+        
+        // Setup offscreen canvas
+        offscreenCanvas = document.createElement("canvas");
+        offscreenCanvas.width = originalImage.width;
+        offscreenCanvas.height = originalImage.height;
+        offscreenCtx = offscreenCanvas.getContext("2d", { willReadFrequently: true });
+        offscreenCtx.drawImage(originalImage, 0, 0);
+        
+        imageDimensions.innerText = `${originalImage.width} × ${originalImage.height} 像素`;
+        
+        // Automatically default picker to top-left pixel color
+        const firstPixel = offscreenCtx.getImageData(0, 0, 1, 1).data;
+        targetColor = { r: firstPixel[0], g: firstPixel[1], b: firstPixel[2] };
+        updateColorUI();
+        
+        processImage();
+    }
+    
+    // 2. Color Picking Logic
+    pickerBtn.addEventListener("click", () => {
+        if (!isImageLoaded) return;
+        
+        isPickingMode = !isPickingMode;
+        if (isPickingMode) {
+            pickerBtn.classList.add("picker-active-btn");
+            pickerBtn.innerHTML = '<i class="fa-solid fa-crosshairs"></i> 请在预览区点击选取颜色...';
+            canvas.classList.add("cursor-crosshair");
+            
+            // Draw original image so they see background to pick
+            ctx.drawImage(originalImage, 0, 0);
+        } else {
+            stopPicking();
+        }
+    });
+    
+    function stopPicking() {
+        isPickingMode = false;
+        pickerBtn.classList.remove("picker-active-btn");
+        pickerBtn.innerHTML = '<i class="fa-solid fa-eye-dropper"></i> 点击开始吸色';
+        canvas.classList.remove("cursor-crosshair");
+        magnifier.style.display = "none";
+        processImage();
+    }
+    
+    // Convert coordinate scaling
+    function getMouseImageCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const x = Math.floor((e.clientX - rect.left) * scaleX);
+        const y = Math.floor((e.clientY - rect.top) * scaleY);
+        
+        return {
+            x: Math.max(0, Math.min(canvas.width - 1, x)),
+            y: Math.max(0, Math.min(canvas.height - 1, y))
+        };
+    }
+    
+    function getOriginalPixel(x, y) {
+        if (!offscreenCtx) return [0, 0, 0, 0];
+        return offscreenCtx.getImageData(x, y, 1, 1).data;
+    }
+    
+    canvas.addEventListener("click", (e) => {
+        if (!isPickingMode || !isImageLoaded) return;
+        
+        const coords = getMouseImageCoords(e);
+        const pixel = getOriginalPixel(coords.x, coords.y);
+        
+        targetColor = { r: pixel[0], g: pixel[1], b: pixel[2] };
+        updateColorUI();
+        stopPicking();
+    });
+    
+    function updateColorUI() {
+        const rgbStr = `rgb(${targetColor.r}, ${targetColor.g}, ${targetColor.b})`;
+        colorBox.style.backgroundColor = rgbStr;
+        colorValRgb.innerText = `RGB: (${targetColor.r}, ${targetColor.g}, ${targetColor.b})`;
+        colorValHex.innerText = `HEX: ${rgbToHex(targetColor.r, targetColor.g, targetColor.b).toUpperCase()}`;
+    }
+    
+    function rgbToHex(r, g, b) {
+        const toHex = (c) => {
+            const hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
+        };
+        return "#" + toHex(r) + toHex(g) + toHex(b);
+    }
+    
+    // 3. Pixel Magnifier Lens Hover Logic
+    canvas.addEventListener("mousemove", (e) => {
+        if (!isPickingMode || !isImageLoaded) {
+            magnifier.style.display = "none";
+            return;
+        }
+        
+        const containerRect = previewContainer.getBoundingClientRect();
+        const mX = e.clientX - containerRect.left;
+        const mY = e.clientY - containerRect.top;
+        
+        let posX = mX + 15;
+        let posY = mY + 15;
+        
+        // Guard boundaries
+        if (posX + 130 > containerRect.width) {
+            posX = mX - 145;
+        }
+        if (posY + 155 > containerRect.height) {
+            posY = mY - 170;
+        }
+        
+        magnifier.style.left = `${posX}px`;
+        magnifier.style.top = `${posY}px`;
+        magnifier.style.display = "block";
+        
+        const coords = getMouseImageCoords(e);
+        drawMagnifier(coords.x, coords.y);
+    });
+    
+    canvas.addEventListener("mouseleave", () => {
+        magnifier.style.display = "none";
+    });
+    
+    const mCtx = magnifierCanvas.getContext("2d");
+    function drawMagnifier(imgX, imgY) {
+        mCtx.clearRect(0, 0, 130, 130);
+        
+        const gridCount = 9; // Show 9x9 pixels
+        const pixelSize = 130 / gridCount;
+        
+        mCtx.imageSmoothingEnabled = false;
+        mCtx.webkitImageSmoothingEnabled = false;
+        mCtx.mozImageSmoothingEnabled = false;
+        mCtx.msImageSmoothingEnabled = false;
+        
+        const cropX = imgX - Math.floor(gridCount / 2);
+        const cropY = imgY - Math.floor(gridCount / 2);
+        
+        // Draw zoomed crop
+        mCtx.drawImage(
+            offscreenCanvas, 
+            cropX, cropY, gridCount, gridCount, 
+            0, 0, 130, 130
+        );
+        
+        // Draw grid lines
+        mCtx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        mCtx.lineWidth = 1;
+        for (let i = 1; i < gridCount; i++) {
+            const pos = i * pixelSize;
+            // Vertical
+            mCtx.beginPath();
+            mCtx.moveTo(pos, 0);
+            mCtx.lineTo(pos, 130);
+            mCtx.stroke();
+            // Horizontal
+            mCtx.beginPath();
+            mCtx.moveTo(0, pos);
+            mCtx.lineTo(130, pos);
+            mCtx.stroke();
+        }
+        
+        // Highlight center pixel
+        const centerOffset = Math.floor(gridCount / 2) * pixelSize;
+        mCtx.strokeStyle = "#3b82f6";
+        mCtx.lineWidth = 2.5;
+        mCtx.strokeRect(centerOffset, centerOffset, pixelSize, pixelSize);
+        
+        // Fetch hovering pixel values
+        const pixel = getOriginalPixel(imgX, imgY);
+        const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+        magnifierVal.innerText = `${hex.toUpperCase()} (${pixel[0]},${pixel[1]},${pixel[2]})`;
+    }
+    
+    // 4. Tolerance Slider
+    thresholdInput.addEventListener("input", function() {
+        threshValDisplay.innerText = this.value;
+        if (isImageLoaded && !isPickingMode) {
+            processImage();
+        }
+    });
+    
+    // 5. Background Cutout Chroma Key Algorithm
+    function processImage() {
+        if (!isImageLoaded) return;
+        
+        // Draw raw image to canvas first
+        ctx.drawImage(originalImage, 0, 0);
+        
+        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = frame.data;
+        const threshold = parseInt(thresholdInput.value);
+        
+        // Use threshold squared to save performance (avoiding Math.sqrt in loop)
+        const thresholdSq = threshold * threshold;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            const distSq = 
+                (r - targetColor.r) ** 2 +
+                (g - targetColor.g) ** 2 +
+                (b - targetColor.b) ** 2;
+                
+            if (distSq <= thresholdSq * 3.0) {
+                data[i + 3] = 0; // Transparent
+            }
+        }
+        
+        ctx.putImageData(frame, 0, 0);
+    }
+    
+    // 6. Download Output
+    downloadBtn.addEventListener("click", () => {
+        if (!isImageLoaded) return;
+        
+        const format = formatSelect.value;
+        let ext = "png";
+        if (format === "image/jpeg") ext = "jpg";
+        else if (format === "image/webp") ext = "webp";
+        
+        const downloadBlob = (blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.download = `cutout_${Date.now()}.${ext}`;
+            link.href = url;
+            link.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 100);
+        };
+
+        // If JPEG, fill transparent pixels with white background
+        if (format === "image/jpeg") {
+            const outputCanvas = document.createElement("canvas");
+            outputCanvas.width = canvas.width;
+            outputCanvas.height = canvas.height;
+            const oCtx = outputCanvas.getContext("2d");
+            
+            oCtx.fillStyle = "#ffffff";
+            oCtx.fillRect(0, 0, canvas.width, canvas.height);
+            oCtx.drawImage(canvas, 0, 0);
+            
+            outputCanvas.toBlob(downloadBlob, format, 0.95);
+        } else {
+            canvas.toBlob(downloadBlob, format, format === "image/webp" ? 0.95 : undefined);
+        }
+    });
+</script>
+{% endblock %}
