@@ -97,7 +97,7 @@ APP_ENV=development COOKIE_SECURE=false ENABLE_DOCS=true python run.py
 
 ```bash
 ruff check . --select E9,F63,F7,F82
-pytest -q --timeout=60
+python -m pytest -q --timeout=60
 ```
 
 CI 会在 pull request 和 `main` push 时依次执行 Ruff、pytest、Docker 镜像构建和容器烟测。

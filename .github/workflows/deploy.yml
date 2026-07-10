@@ -61,7 +61,7 @@ jobs:
           ADMIN_USERNAME: ci-admin
           APP_ENV: test
           COOKIE_SECURE: "false"
-        run: pytest -q --timeout=60
+        run: python -m pytest -q --timeout=60
 
   container-smoke:
     name: Test the release container image
