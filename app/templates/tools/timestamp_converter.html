@@ -195,14 +195,17 @@
     let clockInterval = null;
     let isClockRunning = true;
 
-    // Helper to format Date object into YYYY-MM-DD HH:mm:ss
+    const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+    // 固定按 UTC 或北京时间格式化，不依赖访问者的浏览器本地时区。
     function formatDate(date, isUtc = false) {
-        const year = isUtc ? date.getUTCFullYear() : date.getFullYear();
-        const month = String((isUtc ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
-        const day = String(isUtc ? date.getUTCDate() : date.getDate()).padStart(2, '0');
-        const hours = String(isUtc ? date.getUTCHours() : date.getHours()).padStart(2, '0');
-        const minutes = String(isUtc ? date.getUTCMinutes() : date.getMinutes()).padStart(2, '0');
-        const seconds = String(isUtc ? date.getUTCSeconds() : date.getSeconds()).padStart(2, '0');
+        const displayDate = isUtc ? date : new Date(date.getTime() + BEIJING_OFFSET_MS);
+        const year = displayDate.getUTCFullYear();
+        const month = String(displayDate.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(displayDate.getUTCDate()).padStart(2, '0');
+        const hours = String(displayDate.getUTCHours()).padStart(2, '0');
+        const minutes = String(displayDate.getUTCMinutes()).padStart(2, '0');
+        const seconds = String(displayDate.getUTCSeconds()).padStart(2, '0');
         
         return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
@@ -216,6 +219,7 @@
 
     function startClock() {
         isClockRunning = true;
+        clearInterval(clockInterval);
         updateLiveClock();
         clockInterval = setInterval(updateLiveClock, 1000);
         clockToggleBtn.innerHTML = '<i class="fa-solid fa-pause"></i> 暂停';
@@ -247,6 +251,9 @@
             setTimeout(() => {
                 clockCopyBtn.innerHTML = originalText;
             }, 1000);
+        }).catch(() => {
+            errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+            errorBanner.style.display = 'block';
         });
     });
 
@@ -261,6 +268,9 @@
                 setTimeout(() => {
                     btn.innerHTML = originalHtml;
                 }, 1200);
+            }).catch(() => {
+                errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+                errorBanner.style.display = 'block';
             });
         });
     }
@@ -296,16 +306,22 @@
         if (!tsVal) return;
 
         // Check if value is a numeric string
-        if (!/^\d+$/.test(tsVal)) {
-            errorBanner.textContent = '❌ 转换失败: 请输入合法的纯数字时间戳。';
+        if (!/^-?\d+$/.test(tsVal)) {
+            errorBanner.textContent = '❌ 转换失败: 请输入合法的整数时间戳。';
             errorBanner.style.display = 'block';
             return;
         }
 
         const isMs = tsUnit.value === 'ms';
-        let ms = parseInt(tsVal);
+        let ms = Number(tsVal);
         if (!isMs) {
             ms = ms * 1000;
+        }
+
+        if (!Number.isSafeInteger(ms)) {
+            errorBanner.textContent = '❌ 转换失败: 时间戳超出 JavaScript 可安全表示的范围。';
+            errorBanner.style.display = 'block';
+            return;
         }
 
         const dateObj = new Date(ms);
@@ -325,38 +341,44 @@
         const dateStr = inputDatetime.value.trim();
         if (!dateStr) return;
 
-        // Regex parsing to support various date time strings (e.g. YYYY-MM-DD HH:mm:ss)
-        // Split by dashes, slashes, spaces, colons
-        const parts = dateStr.split(/[-/\s:]+/);
-        if (parts.length < 3) {
+        const match = dateStr.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+        if (!match) {
             errorBanner.textContent = '❌ 转换失败: 日期格式无法解析。推荐格式：YYYY-MM-DD HH:mm:ss';
             errorBanner.style.display = 'block';
             return;
         }
 
-        const year = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const day = parseInt(parts[2]);
-        const hour = parts[3] ? parseInt(parts[3]) : 0;
-        const min = parts[4] ? parseInt(parts[4]) : 0;
-        const sec = parts[5] ? parseInt(parts[5]) : 0;
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        const hour = match[4] ? Number(match[4]) : 0;
+        const min = match[5] ? Number(match[5]) : 0;
+        const sec = match[6] ? Number(match[6]) : 0;
 
-        let dateObj;
-        const isUtc = dateTimezone.value === 'utc';
-
-        if (isUtc) {
-            dateObj = new Date(Date.UTC(year, month, day, hour, min, sec));
-        } else {
-            dateObj = new Date(year, month, day, hour, min, sec);
-        }
-
-        if (isNaN(dateObj.getTime())) {
-            errorBanner.textContent = '❌ 转换失败: 无法计算合法的日期值，请确认输入的年、月、日数值是否正确。';
+        if (month < 1 || month > 12 || day < 1 || day > 31 ||
+            hour < 0 || hour > 23 || min < 0 || min > 59 || sec < 0 || sec > 59) {
+            errorBanner.textContent = '❌ 转换失败: 日期或时间字段超出合法范围。';
             errorBanner.style.display = 'block';
             return;
         }
 
-        const msVal = dateObj.getTime();
+        const normalizedUtc = Date.UTC(year, month - 1, day, hour, min, sec);
+        const normalizedDate = new Date(normalizedUtc);
+        const isExactDate = normalizedDate.getUTCFullYear() === year &&
+            normalizedDate.getUTCMonth() === month - 1 &&
+            normalizedDate.getUTCDate() === day &&
+            normalizedDate.getUTCHours() === hour &&
+            normalizedDate.getUTCMinutes() === min &&
+            normalizedDate.getUTCSeconds() === sec;
+
+        if (!isExactDate) {
+            errorBanner.textContent = '❌ 转换失败: 日期不存在，请检查年、月、日。';
+            errorBanner.style.display = 'block';
+            return;
+        }
+
+        const isUtc = dateTimezone.value === 'utc';
+        const msVal = isUtc ? normalizedUtc : normalizedUtc - BEIJING_OFFSET_MS;
         outputStampSec.value = Math.floor(msVal / 1000);
         outputStampMs.value = msVal;
     });

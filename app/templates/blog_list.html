@@ -52,4 +52,20 @@
         {% endif %}
     </div>
 
+    {% if pagination and pagination.total_pages > 1 %}
+        <nav class="pagination-controls" aria-label="博客分页">
+            {% if pagination.page > 1 %}
+                <a class="btn btn-secondary" href="/blog?page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}">
+                    <i class="fa-solid fa-angle-left"></i> 上一页
+                </a>
+            {% endif %}
+            <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 页，共 {{ pagination.total }} 篇</span>
+            {% if pagination.page < pagination.total_pages %}
+                <a class="btn btn-secondary" href="/blog?page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}">
+                    下一页 <i class="fa-solid fa-angle-right"></i>
+                </a>
+            {% endif %}
+        </nav>
+    {% endif %}
+
 {% endblock %}

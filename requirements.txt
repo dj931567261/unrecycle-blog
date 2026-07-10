@@ -1,10 +1,12 @@
-fastapi>=0.110.0
-uvicorn>=0.28.0
-sqlalchemy>=2.0.0
-jinja2>=3.1.0
-python-multipart>=0.0.9
-markdown>=3.6
-pygments>=2.17.0
-pyjwt>=2.8.0
-bcrypt>=4.0.0
-
+# 生产直接依赖使用已验证版本；完整可复现构建仍应配合 lock/hash 与固定基础镜像 digest。
+fastapi==0.136.3
+starlette==1.1.0
+pydantic==2.13.4
+uvicorn==0.48.0
+sqlalchemy==2.0.50
+jinja2==3.1.6
+python-multipart==0.0.29
+markdown==3.10.2
+pygments==2.20.0
+pyjwt==2.13.0
+bcrypt==5.0.0

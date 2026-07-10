@@ -118,6 +118,8 @@ venv.bak/
 # SQLite databases
 *.db
 *.sqlite3
+/data/
+/uploads/
 
 # OS files
 .DS_Store

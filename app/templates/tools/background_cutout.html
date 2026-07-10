@@ -17,7 +17,7 @@
         
         <!-- Input / Output workspace split -->
         <div class="tool-workspace">
-            
+
             <!-- Left panel: Controls -->
             <div class="panel-container">
                 <div class="panel-title-bar">
@@ -76,7 +76,7 @@
                     
                 </div>
             </div>
-            
+
             <!-- Right panel: Canvas Preview -->
             <div class="panel-container">
                 <div class="panel-title-bar">
@@ -106,6 +106,7 @@
             </div>
             
         </div>
+        <div id="cutout-error" class="error-banner" style="margin-top: 16px;"></div>
     </div>
 
 {% endblock %}
@@ -392,6 +393,10 @@
     const magnifier = document.getElementById("magnifier");
     const magnifierCanvas = document.getElementById("magnifier-canvas");
     const magnifierVal = document.getElementById("magnifier-val");
+    const errorBanner = document.getElementById("cutout-error");
+
+    const MAX_FILE_SIZE = 15 * 1024 * 1024;
+    const MAX_PIXELS = 16_000_000;
     
     // States
     let originalImage = null;
@@ -402,6 +407,17 @@
     // Offscreen Canvas for original pixels
     let offscreenCanvas = null;
     let offscreenCtx = null;
+    let processFrame = null;
+
+    function showError(message) {
+        errorBanner.textContent = `❌ ${message}`;
+        errorBanner.style.display = "block";
+    }
+
+    function clearError() {
+        errorBanner.style.display = "none";
+        errorBanner.textContent = "";
+    }
     
     // 1. Upload Logic (Click and Drag/Drop)
     dropZone.addEventListener("click", () => {
@@ -411,6 +427,7 @@
     uploadInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         handleFile(file);
+        e.target.value = "";
     });
     
     // Drag & Drop event bindings
@@ -435,20 +452,40 @@
     });
     
     function handleFile(file) {
-        if (!file || !file.type.match("image.*")) return;
+        clearError();
+        if (!file || !file.type.match("image.*")) {
+            showError("请选择浏览器支持的图片文件。");
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            showError("图片文件不能超过 15 MB。");
+            return;
+        }
         
         const reader = new FileReader();
         reader.onload = (event) => {
             originalImage = new Image();
             originalImage.onload = () => {
+                const pixels = originalImage.width * originalImage.height;
+                if (!originalImage.width || !originalImage.height || pixels > MAX_PIXELS) {
+                    originalImage = null;
+                    showError("图片像素过大，最大支持约 1600 万像素。");
+                    return;
+                }
                 initCanvas();
+            };
+            originalImage.onerror = () => {
+                originalImage = null;
+                showError("图片内容损坏或格式不受当前浏览器支持。");
             };
             originalImage.src = event.target.result;
         };
+        reader.onerror = () => showError("读取图片失败，请重新选择文件。");
         reader.readAsDataURL(file);
     }
     
     function initCanvas() {
+        clearError();
         isImageLoaded = true;
         placeholder.style.display = "none";
         canvas.style.display = "block";
@@ -641,40 +678,45 @@
     thresholdInput.addEventListener("input", function() {
         threshValDisplay.innerText = this.value;
         if (isImageLoaded && !isPickingMode) {
-            processImage();
+            cancelAnimationFrame(processFrame);
+            processFrame = requestAnimationFrame(processImage);
         }
     });
     
     // 5. Background Cutout Chroma Key Algorithm
     function processImage() {
         if (!isImageLoaded) return;
-        
-        // Draw raw image to canvas first
-        ctx.drawImage(originalImage, 0, 0);
-        
-        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = frame.data;
-        const threshold = parseInt(thresholdInput.value);
-        
-        // Use threshold squared to save performance (avoiding Math.sqrt in loop)
-        const thresholdSq = threshold * threshold;
-        
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-            
-            const distSq = 
-                (r - targetColor.r) ** 2 +
-                (g - targetColor.g) ** 2 +
-                (b - targetColor.b) ** 2;
+        try {
+            clearError();
+            // Draw raw image to canvas first
+            ctx.drawImage(originalImage, 0, 0);
+
+            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = frame.data;
+            const threshold = parseInt(thresholdInput.value);
+
+            // Use threshold squared to save performance (avoiding Math.sqrt in loop)
+            const thresholdSq = threshold * threshold;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
                 
-            if (distSq <= thresholdSq * 3.0) {
-                data[i + 3] = 0; // Transparent
+                const distSq =
+                    (r - targetColor.r) ** 2 +
+                    (g - targetColor.g) ** 2 +
+                    (b - targetColor.b) ** 2;
+
+                if (distSq <= thresholdSq * 3.0) {
+                    data[i + 3] = 0; // Transparent
+                }
             }
+
+            ctx.putImageData(frame, 0, 0);
+        } catch (error) {
+            showError(`处理图片失败：${error.message}`);
         }
-        
-        ctx.putImageData(frame, 0, 0);
     }
     
     // 6. Download Output
@@ -687,6 +729,14 @@
         else if (format === "image/webp") ext = "webp";
         
         const downloadBlob = (blob) => {
+            if (!blob) {
+                showError("图片导出失败，浏览器没有生成有效文件。");
+                return;
+            }
+            if (format === "image/webp" && blob.type !== "image/webp") {
+                showError("当前浏览器不支持 WebP 导出，请改用 PNG。");
+                return;
+            }
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.download = `cutout_${Date.now()}.${ext}`;

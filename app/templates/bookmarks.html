@@ -6,6 +6,8 @@
 
     <style>
         .filter-tag-btn {
+            display: inline-flex;
+            align-items: center;
             padding: 6px 14px;
             font-size: 13px;
             border-radius: 20px;
@@ -13,7 +15,8 @@
             background: rgba(255, 255, 255, 0.02);
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.2s ease;
+            text-decoration: none;
+            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .filter-tag-btn:hover {
             border-color: var(--accent-blue);
@@ -39,9 +42,11 @@
         <span style="font-size: 13px; color: var(--text-muted); margin-right: 6px; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-filter"></i> 标签过滤:
         </span>
-        <button class="filter-tag-btn active" onclick="filterBookmarks('all', this)">全部</button>
+        <a class="filter-tag-btn{% if not selected_tag %} active{% endif %}"
+           href="/bookmarks?page=1&page_size={{ pagination.page_size }}">全部</a>
         {% for tag in tags %}
-            <button class="filter-tag-btn" onclick="filterBookmarks('{{ tag }}', this)">{{ tag }}</button>
+            <a class="filter-tag-btn{% if selected_tag == tag %} active{% endif %}"
+               href="/bookmarks?page=1&page_size={{ pagination.page_size }}&tag={{ tag | urlencode }}">{{ tag }}</a>
         {% endfor %}
     </div>
     {% endif %}
@@ -53,7 +58,7 @@
                 <div class="glass-card bookmark-card" data-tags="{{ bookmark.tags or '' }}">
                     <div class="bookmark-header">
                         <span class="tag-badge" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); font-weight: 600;"># 收藏</span>
-                        <a href="{{ bookmark.url }}" target="_blank" class="bookmark-link-btn">
+                        <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" class="bookmark-link-btn">
                             访问原网站 <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i>
                         </a>
                     </div>
@@ -75,7 +80,11 @@
         {% else %}
             <div class="glass-card" style="grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-secondary);">
                 <i class="fa-solid fa-bookmark" style="font-size: 40px; margin-bottom: 16px; color: var(--text-muted);"></i>
-                <p>暂无灵感书签。快登录管理后台添加吧！</p>
+                {% if selected_tag %}
+                    <p>标签“{{ selected_tag }}”下暂无收藏。</p>
+                {% else %}
+                    <p>暂无灵感书签。快登录管理后台添加吧！</p>
+                {% endif %}
                 {% if is_admin %}
                     <a href="/admin" class="btn btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-plus"></i> 添加收藏</a>
                 {% endif %}
@@ -83,32 +92,20 @@
         {% endif %}
     </div>
 
-{% endblock %}
+    {% if pagination and pagination.total_pages > 1 %}
+        <nav class="pagination-controls" aria-label="收藏分页">
+            {% if pagination.page > 1 %}
+                <a class="btn btn-secondary" href="/bookmarks?page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}{% if selected_tag %}&tag={{ selected_tag | urlencode }}{% endif %}">
+                    <i class="fa-solid fa-angle-left"></i> 上一页
+                </a>
+            {% endif %}
+            <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 页，共 {{ pagination.total }} 条</span>
+            {% if pagination.page < pagination.total_pages %}
+                <a class="btn btn-secondary" href="/bookmarks?page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}{% if selected_tag %}&tag={{ selected_tag | urlencode }}{% endif %}">
+                    下一页 <i class="fa-solid fa-angle-right"></i>
+                </a>
+            {% endif %}
+        </nav>
+    {% endif %}
 
-{% block scripts %}
-<script>
-    function filterBookmarks(tag, btn) {
-        // Toggle active button class
-        document.querySelectorAll('.filter-tag-btn').forEach(button => {
-            button.classList.remove('active');
-        });
-        btn.classList.add('active');
-
-        // Filter cards
-        const cards = document.querySelectorAll('.bookmark-card');
-        cards.forEach(card => {
-            if (tag === 'all') {
-                card.style.display = 'flex';
-            } else {
-                const cardTagsStr = card.getAttribute('data-tags') || '';
-                const cardTags = cardTagsStr.split(',').map(t => t.trim());
-                if (cardTags.includes(tag)) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
-                }
-            }
-        });
-    }
-</script>
 {% endblock %}

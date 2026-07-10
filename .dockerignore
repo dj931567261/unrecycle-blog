@@ -1,0 +1,50 @@
+# 版本控制与编辑器文件
+.git/
+.github/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Python 虚拟环境、缓存与构建产物
+venv/
+.venv/
+env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# 本地配置与密钥
+.env
+.env.*
+
+# 持久化数据不得进入镜像
+*.db
+*.sqlite
+*.sqlite3
+data/
+uploads/
+app/static/uploads/
+
+# 已移除模块、素材和本地资料
+game/
+app/static/images/heroes/
+posts/
+PROJECT_OVERVIEW.md
+AGENTS.md
+
+# 运行镜像不需要的工程文件
+tests/
+requirements-dev.txt
+docker-compose*.yml
+README.md
+download_assets.py
+run.py

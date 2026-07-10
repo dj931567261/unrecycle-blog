@@ -279,6 +279,9 @@
                 copyBtn.style.borderColor = '';
                 copyBtn.style.color = '';
             }, 1500);
+        }).catch(() => {
+            errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+            errorBanner.style.display = 'block';
         });
     });
 </script>

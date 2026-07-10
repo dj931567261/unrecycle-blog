@@ -12,7 +12,7 @@
             color: var(--text-secondary);
             cursor: pointer;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.2s ease;
+            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
             user-select: none;
         }
         .admin-quick-tag:hover {
@@ -37,13 +37,13 @@
         
         <!-- Tab Selector Headers -->
         <div class="admin-tab-nav">
-            <button class="admin-tab-btn active" onclick="switchTab('posts-tab', this)">
+            <button class="admin-tab-btn active" data-admin-tab="posts-tab" onclick="switchTab('posts-tab', this)">
                 <i class="fa-solid fa-book-open" style="margin-right: 6px;"></i> 博客文章管理
             </button>
-            <button class="admin-tab-btn" onclick="switchTab('navs-tab', this)">
+            <button class="admin-tab-btn" data-admin-tab="navs-tab" onclick="switchTab('navs-tab', this)">
                 <i class="fa-solid fa-compass" style="margin-right: 6px;"></i> 导航链接管理
             </button>
-            <button class="admin-tab-btn" onclick="switchTab('bookmarks-tab', this)">
+            <button class="admin-tab-btn" data-admin-tab="bookmarks-tab" onclick="switchTab('bookmarks-tab', this)">
                 <i class="fa-solid fa-bookmark" style="margin-right: 6px;"></i> 灵感书签管理
             </button>
 
@@ -101,6 +101,17 @@
                     </tbody>
                 </table>
             </div>
+            {% if post_pagination and post_pagination.total_pages > 1 %}
+                <nav class="pagination-controls" aria-label="后台文章分页">
+                    {% if post_pagination.page > 1 %}
+                        <a class="btn btn-secondary" href="/admin?post_page={{ post_pagination.page - 1 }}&bookmark_page={{ bookmark_pagination.page }}&page_size={{ post_pagination.page_size }}#posts-tab">上一页</a>
+                    {% endif %}
+                    <span>第 {{ post_pagination.page }} / {{ post_pagination.total_pages }} 页，共 {{ post_pagination.total }} 篇</span>
+                    {% if post_pagination.page < post_pagination.total_pages %}
+                        <a class="btn btn-secondary" href="/admin?post_page={{ post_pagination.page + 1 }}&bookmark_page={{ bookmark_pagination.page }}&page_size={{ post_pagination.page_size }}#posts-tab">下一页</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
         </div>
 
         <!-- TAB 2: NAVIGATION LINKS -->
@@ -128,7 +139,7 @@
                                         <span style="margin-right: 6px;">{{ link.icon or '📌' }}</span>{{ link.title }}
                                     </td>
                                     <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                        <a href="{{ link.url }}" target="_blank" style="color: var(--accent-blue);">{{ link.url }}</a>
+                                        <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue);">{{ link.url }}</a>
                                     </td>
                                     <td><span class="tag-badge">{{ link.category }}</span></td>
                                     <td>{{ link.description or '-' }}</td>
@@ -178,7 +189,7 @@
                                 <tr id="bookmark-row-{{ bookmark.id }}">
                                     <td style="font-weight: 600;">{{ bookmark.title }}</td>
                                     <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                        <a href="{{ bookmark.url }}" target="_blank" style="color: var(--accent-blue);">{{ bookmark.url }}</a>
+                                        <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-blue);">{{ bookmark.url }}</a>
                                     </td>
                                     <td>{{ bookmark.description or '-' }}</td>
                                     <td>
@@ -189,7 +200,11 @@
                                         {% endif %}
                                     </td>
                                     <td>{{ bookmark.created_at | datetime }}</td>
-                                    <td style="text-align: right;">
+                                    <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+                                        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                                onclick="editBookmark({{ bookmark|tojson|forceescape }})">
+                                            <i class="fa-solid fa-pen-to-square"></i> 编辑
+                                        </button>
                                         <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;" 
                                                 onclick="deleteBookmark({{ bookmark.id }})">
                                             <i class="fa-solid fa-trash"></i> 删除
@@ -205,6 +220,17 @@
                     </tbody>
                 </table>
             </div>
+            {% if bookmark_pagination and bookmark_pagination.total_pages > 1 %}
+                <nav class="pagination-controls" aria-label="后台收藏分页">
+                    {% if bookmark_pagination.page > 1 %}
+                        <a class="btn btn-secondary" href="/admin?post_page={{ post_pagination.page }}&bookmark_page={{ bookmark_pagination.page - 1 }}&page_size={{ bookmark_pagination.page_size }}#bookmarks-tab">上一页</a>
+                    {% endif %}
+                    <span>第 {{ bookmark_pagination.page }} / {{ bookmark_pagination.total_pages }} 页，共 {{ bookmark_pagination.total }} 条</span>
+                    {% if bookmark_pagination.page < bookmark_pagination.total_pages %}
+                        <a class="btn btn-secondary" href="/admin?post_page={{ post_pagination.page }}&bookmark_page={{ bookmark_pagination.page + 1 }}&page_size={{ bookmark_pagination.page_size }}#bookmarks-tab">下一页</a>
+                    {% endif %}
+                </nav>
+            {% endif %}
         </div>
 
 
@@ -221,7 +247,7 @@
             <form id="post-form">
                 <input type="hidden" id="post-id">
                 
-                <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                <div class="admin-post-meta-grid">
                     <!-- Left: content and meta -->
                     <div style="display: flex; flex-direction: column; gap: 16px;">
                         <div class="form-group" style="margin-bottom:0;">
@@ -269,7 +295,7 @@
                             </button>
                             <input type="file" id="image-upload-input" style="display:none;" accept="image/*" onchange="handleImageUploadSelect(this)">
                         </label>
-                        <span style="font-size:12px; color:var(--text-muted);">点击按钮、拖拽或粘贴图片均可上传</span>
+                        <span id="image-upload-status" class="image-upload-status" role="status">点击按钮、拖拽或粘贴图片均可上传</span>
                     </div>
                     <div class="md-editor-split">
                         <textarea id="post-content" required class="md-editor-input" placeholder="支持标准 Markdown 语法..." oninput="updateEditorPreview()"></textarea>
@@ -308,7 +334,7 @@
                     <label for="nav-desc">简短描述</label>
                     <input type="text" id="nav-desc" class="form-control" placeholder="一句话简单介绍下网站用途">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                <div class="admin-nav-fields-grid">
                     <div class="form-group">
                         <label for="nav-category-select">分类</label>
                         <select id="nav-category-select" class="form-control" onchange="handleNavCategoryChange()" style="cursor: pointer;">
@@ -340,10 +366,11 @@
     <div id="bookmark-modal" class="modal-backdrop">
         <div class="glass-card admin-modal" style="max-width: 550px; padding: 24px;">
             <div class="modal-header">
-                <h3>新建网页收藏</h3>
+                <h3 id="bookmark-modal-title">新建网页收藏</h3>
                 <button class="modal-close" onclick="closeBookmarkModal()">&times;</button>
             </div>
             <form id="bookmark-form">
+                <input type="hidden" id="bookmark-id">
                 <div class="form-group">
                     <label for="bookmark-title">收藏标题</label>
                     <input type="text" id="bookmark-title" required class="form-control" placeholder="输入网页标题...">
@@ -363,7 +390,7 @@
                     <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                         <span style="font-size: 11px; color: var(--text-muted);">常用标签 (点击添加):</span>
                         {% for tag in bookmark_tags %}
-                            <span class="admin-quick-tag" onclick="addBookmarkQuickTag('{{ tag }}')">{{ tag }}</span>
+                            <button type="button" class="admin-quick-tag" data-bookmark-quick-tag="{{ tag }}">{{ tag }}</button>
                         {% endfor %}
                     </div>
                     {% endif %}
@@ -392,6 +419,18 @@
         });
         document.getElementById(tabId).classList.add('active');
         btn.classList.add('active');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${tabId}`);
+        }
+    }
+
+    const initialAdminTab = window.location.hash.slice(1);
+    if (initialAdminTab) {
+        const initialTabButton = Array.from(document.querySelectorAll('[data-admin-tab]'))
+            .find(button => button.dataset.adminTab === initialAdminTab);
+        if (initialTabButton && document.getElementById(initialAdminTab)) {
+            switchTab(initialAdminTab, initialTabButton);
+        }
     }
 
     // Modal management helpers
@@ -401,6 +440,51 @@
     function hideModal(modalId) {
         document.getElementById(modalId).classList.remove('open');
     }
+
+    function redirectToLogin() {
+        window.location.href = '/login?expired=1';
+    }
+
+    async function adminFetch(url, options = {}) {
+        const response = await fetch(url, options);
+        if (response.status === 401) {
+            redirectToLogin();
+            throw new Error('AUTH_EXPIRED');
+        }
+        return response;
+    }
+
+    function setFormSubmitting(form, isSubmitting, busyText = '保存中...') {
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (!submitButton) return;
+        if (isSubmitting) {
+            submitButton.dataset.originalHtml = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.textContent = busyText;
+        } else {
+            submitButton.disabled = false;
+            if (submitButton.dataset.originalHtml) {
+                submitButton.innerHTML = submitButton.dataset.originalHtml;
+                delete submitButton.dataset.originalHtml;
+            }
+        }
+    }
+
+    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+        modal.addEventListener('click', event => {
+            if (event.target === modal && !modal.querySelector('button[type="submit"]:disabled')) {
+                modal.classList.remove('open');
+            }
+        });
+    });
+
+    window.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        const openModal = document.querySelector('.modal-backdrop.open');
+        if (openModal && !openModal.querySelector('button[type="submit"]:disabled')) {
+            openModal.classList.remove('open');
+        }
+    });
 
     // --- BLOG POST MANAGEMENT ---
     const postModal = document.getElementById('post-modal');
@@ -414,12 +498,19 @@
     const postContent = document.getElementById('post-content');
     const postPreview = document.getElementById('post-preview');
     const postIdInput = document.getElementById('post-id');
+    const imageUploadStatus = document.getElementById('image-upload-status');
+
+    function setImageUploadStatus(message, state = 'idle') {
+        imageUploadStatus.textContent = message;
+        imageUploadStatus.dataset.state = state;
+    }
 
     function openPostModal() {
         document.getElementById('post-modal-title').textContent = '撰写技术博文';
         postForm.reset();
         postIdInput.value = '';
         postPreview.innerHTML = '<span class="text-muted" style="font-style: italic;">实时预览区域...</span>';
+        setImageUploadStatus('点击按钮、拖拽或粘贴图片均可上传');
         showModal('post-modal');
     }
     function closePostModal() {
@@ -489,39 +580,123 @@
         return newLines.join("\n");
     }
 
+    function escapeRawHtml(markdownText) {
+        return markdownText
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function isSafePreviewUrl(rawUrl, allowImageData = false) {
+        const value = String(rawUrl || '').trim();
+        if (!value) return false;
+        if (value.startsWith('#') || value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) {
+            return true;
+        }
+        if (allowImageData && /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value)) {
+            return true;
+        }
+        try {
+            const parsed = new URL(value, window.location.origin);
+            return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function buildSafeMarkdownPreview(markdownText) {
+        const template = document.createElement('template');
+        const escapedMarkdown = escapeRawHtml(preprocessMarkdown(markdownText));
+        template.innerHTML = marked.parse(escapedMarkdown);
+
+        template.content.querySelectorAll('*').forEach(element => {
+            Array.from(element.attributes).forEach(attribute => {
+                if (attribute.name.toLowerCase().startsWith('on') || attribute.name.toLowerCase() === 'style') {
+                    element.removeAttribute(attribute.name);
+                }
+            });
+
+            if (element.tagName === 'A') {
+                const href = element.getAttribute('href');
+                if (!isSafePreviewUrl(href)) {
+                    element.removeAttribute('href');
+                    element.setAttribute('title', '已阻止不安全链接');
+                } else if (/^https?:/i.test(href || '')) {
+                    element.setAttribute('target', '_blank');
+                    element.setAttribute('rel', 'noopener noreferrer');
+                }
+            }
+
+            if (element.tagName === 'IMG' && !isSafePreviewUrl(element.getAttribute('src'), true)) {
+                element.removeAttribute('src');
+                element.setAttribute('alt', '已阻止不安全图片地址');
+            }
+        });
+        return template.content;
+    }
+
     // Realtime Markdown Preview
     function updateEditorPreview() {
         const rawContent = postContent.value;
         if (rawContent && window.marked) {
-            postPreview.innerHTML = marked.parse(preprocessMarkdown(rawContent));
+            postPreview.replaceChildren(buildSafeMarkdownPreview(rawContent));
         } else {
-            postPreview.innerHTML = '<span class="text-muted" style="font-style: italic;">实时预览区域...</span>';
+            const placeholder = document.createElement('span');
+            placeholder.className = 'text-muted';
+            placeholder.textContent = '实时预览区域...';
+            postPreview.replaceChildren(placeholder);
         }
     }
 
     // Drag-and-Drop Image Uploader logic in Markdown Editor textarea
     postContent.addEventListener('paste', handleImagePaste);
     postContent.addEventListener('drop', handleImageDrop);
+    postContent.addEventListener('dragover', event => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        postContent.classList.add('upload-drop-active');
+        setImageUploadStatus('松开鼠标以上传图片', 'active');
+    });
+    postContent.addEventListener('dragleave', () => {
+        postContent.classList.remove('upload-drop-active');
+        setImageUploadStatus('点击按钮、拖拽或粘贴图片均可上传');
+    });
+
+    function insertUploadPlaceholder(label = '图片描述') {
+        const token = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const placeholder = `![上传中...](Uploading-${token})`;
+        const pos = postContent.selectionStart;
+        const text = postContent.value;
+        postContent.value = `${text.slice(0, pos)}\n${placeholder}\n${text.slice(pos)}`;
+        return { token, placeholder, label };
+    }
+
+    function finishUploadPlaceholder(upload, url, fallbackLabel = '图片描述') {
+        const replacement = url
+            ? `![${upload.label || fallbackLabel}](${url})`
+            : '![上传失败]()';
+        postContent.value = postContent.value.replace(upload.placeholder, replacement);
+        updateEditorPreview();
+    }
 
     async function handleImageUploadSelect(input) {
         const file = input.files?.[0];
         if (!file) return;
         
-        const filename = file.name;
-        
-        // Inject upload state placeholder
-        const pos = postContent.selectionStart;
-        const text = postContent.value;
-        postContent.value = text.slice(0, pos) + "\n![上传中...](Uploading...)\n" + text.slice(pos);
-        
-        const url = await uploadImageFile(file);
-        if (url) {
-            postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![${filename}](${url})`);
-        } else {
-            postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![上传失败]()`);
+        const upload = insertUploadPlaceholder(file.name || '图片描述');
+        setImageUploadStatus(`正在上传 ${file.name || '图片'}...`, 'active');
+        try {
+            const url = await uploadImageFile(file);
+            finishUploadPlaceholder(upload, url);
+            setImageUploadStatus(`已上传 ${file.name || '图片'}`, 'success');
+        } catch (error) {
+            finishUploadPlaceholder(upload, null);
+            if (error.message !== 'AUTH_EXPIRED') {
+                setImageUploadStatus(error.message || '图片上传失败', 'error');
+            }
+        } finally {
+            input.value = '';
         }
-        input.value = ''; // Reset file input
-        updateEditorPreview();
     }
 
     async function uploadImageFile(file) {
@@ -529,7 +704,7 @@
         formData.append('file', file);
         
         try {
-            const response = await fetch('/api/upload', {
+            const response = await adminFetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
@@ -537,10 +712,18 @@
                 const data = await response.json();
                 return data.url; // Retuns file path /static/uploads/uuid.png
             }
+            let detail = '图片上传失败';
+            try {
+                const data = await response.json();
+                detail = data.detail || detail;
+            } catch (error) {
+                // Ignore non-JSON error bodies.
+            }
+            throw new Error(detail);
         } catch (err) {
             console.error("Image upload failed:", err);
+            throw err;
         }
-        return null;
     }
 
     async function handleImagePaste(e) {
@@ -551,42 +734,46 @@
                 e.preventDefault();
                 const file = items[i].getAsFile();
                 
-                // Inject upload state placeholder
-                const pos = postContent.selectionStart;
-                const text = postContent.value;
-                postContent.value = text.slice(0, pos) + "\n![上传中...](Uploading...)\n" + text.slice(pos);
-                
-                const url = await uploadImageFile(file);
-                if (url) {
-                    postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![图片描述](${url})`);
-                } else {
-                    postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![上传失败]()`);
+                const upload = insertUploadPlaceholder('图片描述');
+                setImageUploadStatus('正在上传粘贴的图片...', 'active');
+                try {
+                    const url = await uploadImageFile(file);
+                    finishUploadPlaceholder(upload, url);
+                    setImageUploadStatus('粘贴图片上传成功', 'success');
+                } catch (error) {
+                    finishUploadPlaceholder(upload, null);
+                    if (error.message !== 'AUTH_EXPIRED') {
+                        setImageUploadStatus(error.message || '粘贴图片上传失败', 'error');
+                    }
                 }
-                updateEditorPreview();
             }
         }
     }
 
     async function handleImageDrop(e) {
         e.preventDefault();
+        postContent.classList.remove('upload-drop-active');
         const files = e.dataTransfer?.files;
-        if (!files || files.length === 0) return;
+        if (!files || files.length === 0) {
+            setImageUploadStatus('未检测到可上传文件', 'error');
+            return;
+        }
         
         for (let i = 0; i < files.length; i++) {
             if (files[i].type.indexOf('image') !== -1) {
                 const file = files[i];
-                
-                const pos = postContent.selectionStart;
-                const text = postContent.value;
-                postContent.value = text.slice(0, pos) + "\n![上传中...](Uploading...)\n" + text.slice(pos);
-                
-                const url = await uploadImageFile(file);
-                if (url) {
-                    postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![图片描述](${url})`);
-                } else {
-                    postContent.value = postContent.value.replace("![上传中...](Uploading...)", `![上传失败]()`);
+                const upload = insertUploadPlaceholder(file.name || '图片描述');
+                setImageUploadStatus(`正在上传 ${file.name || '图片'}...`, 'active');
+                try {
+                    const url = await uploadImageFile(file);
+                    finishUploadPlaceholder(upload, url);
+                    setImageUploadStatus(`已上传 ${file.name || '图片'}`, 'success');
+                } catch (error) {
+                    finishUploadPlaceholder(upload, null);
+                    if (error.message !== 'AUTH_EXPIRED') {
+                        setImageUploadStatus(error.message || '拖拽图片上传失败', 'error');
+                    }
                 }
-                updateEditorPreview();
             }
         }
     }
@@ -594,6 +781,9 @@
     // Submit Article form
     postForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (postForm.dataset.submitting === 'true') return;
+        postForm.dataset.submitting = 'true';
+        setFormSubmitting(postForm, true, '保存文章中...');
         
         const payload = {
             title: postTitle.value.trim(),
@@ -610,7 +800,7 @@
         const method = id ? 'PUT' : 'POST';
         
         try {
-            const response = await fetch(url, {
+            const response = await adminFetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -623,7 +813,10 @@
                 alert('保存失败: ' + (data.detail || '未知错误'));
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常，请稍后重试');
+        } finally {
+            postForm.dataset.submitting = 'false';
+            setFormSubmitting(postForm, false);
         }
     });
 
@@ -646,14 +839,14 @@
     async function deletePost(postId) {
         if (!confirm('你确定要删除这篇博客吗？删除后将无法恢复。')) return;
         try {
-            const response = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+            const response = await adminFetch(`/api/posts/${postId}`, { method: 'DELETE' });
             if (response.ok) {
                 document.getElementById(`post-row-${postId}`).remove();
             } else {
                 alert('删除失败');
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常');
         }
     }
 
@@ -707,6 +900,9 @@
 
     navForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (navForm.dataset.submitting === 'true') return;
+        navForm.dataset.submitting = 'true';
+        setFormSubmitting(navForm, true, '保存导航中...');
         const payload = {
             title: navTitle.value.trim(),
             url: navUrl.value.trim(),
@@ -720,7 +916,7 @@
         const method = id ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
+            const response = await adminFetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -732,7 +928,10 @@
                 alert('保存失败');
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常，请稍后重试');
+        } finally {
+            navForm.dataset.submitting = 'false';
+            setFormSubmitting(navForm, false);
         }
     });
 
@@ -770,14 +969,14 @@
     async function deleteNavLink(linkId) {
         if (!confirm('确定要删除这个导航链接吗？')) return;
         try {
-            const response = await fetch(`/api/nav_links/${linkId}`, { method: 'DELETE' });
+            const response = await adminFetch(`/api/nav_links/${linkId}`, { method: 'DELETE' });
             if (response.ok) {
                 document.getElementById(`nav-row-${linkId}`).remove();
             } else {
                 alert('删除失败');
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常');
         }
     }
 
@@ -787,6 +986,7 @@
     const bookmarkUrl = document.getElementById('bookmark-url');
     const bookmarkDesc = document.getElementById('bookmark-desc');
     const bookmarkTags = document.getElementById('bookmark-tags');
+    const bookmarkIdInput = document.getElementById('bookmark-id');
 
     window.addBookmarkQuickTag = function(tag) {
         let val = bookmarkTags.value.trim();
@@ -798,8 +998,16 @@
         bookmarkTags.focus();
     };
 
+    document.querySelectorAll('[data-bookmark-quick-tag]').forEach(button => {
+        button.addEventListener('click', () => {
+            window.addBookmarkQuickTag(button.dataset.bookmarkQuickTag || '');
+        });
+    });
+
     function openBookmarkModal() {
         bookmarkForm.reset();
+        bookmarkIdInput.value = '';
+        document.getElementById('bookmark-modal-title').textContent = '新建网页收藏';
         showModal('bookmark-modal');
     }
     function closeBookmarkModal() {
@@ -808,6 +1016,9 @@
 
     bookmarkForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (bookmarkForm.dataset.submitting === 'true') return;
+        bookmarkForm.dataset.submitting = 'true';
+        setFormSubmitting(bookmarkForm, true, '保存收藏中...');
         const payload = {
             title: bookmarkTitle.value.trim(),
             url: bookmarkUrl.value.trim(),
@@ -816,8 +1027,9 @@
         };
 
         try {
-            const response = await fetch('/api/bookmarks', {
-                method: 'POST',
+            const bookmarkId = bookmarkIdInput.value;
+            const response = await adminFetch(bookmarkId ? `/api/bookmarks/${bookmarkId}` : '/api/bookmarks', {
+                method: bookmarkId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
@@ -828,21 +1040,34 @@
                 alert('保存失败');
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常，请稍后重试');
+        } finally {
+            bookmarkForm.dataset.submitting = 'false';
+            setFormSubmitting(bookmarkForm, false);
         }
     });
+
+    function editBookmark(bookmarkObj) {
+        openBookmarkModal();
+        document.getElementById('bookmark-modal-title').textContent = '编辑网页收藏';
+        bookmarkIdInput.value = bookmarkObj.id;
+        bookmarkTitle.value = bookmarkObj.title || '';
+        bookmarkUrl.value = bookmarkObj.url || '';
+        bookmarkDesc.value = bookmarkObj.description || '';
+        bookmarkTags.value = bookmarkObj.tags || '';
+    }
 
     async function deleteBookmark(bookmarkId) {
         if (!confirm('确定要删除这个收藏吗？')) return;
         try {
-            const response = await fetch(`/api/bookmarks/${bookmarkId}`, { method: 'DELETE' });
+            const response = await adminFetch(`/api/bookmarks/${bookmarkId}`, { method: 'DELETE' });
             if (response.ok) {
                 document.getElementById(`bookmark-row-${bookmarkId}`).remove();
             } else {
                 alert('删除失败');
             }
         } catch (err) {
-            alert('网络异常');
+            if (err.message !== 'AUTH_EXPIRED') alert('网络异常');
         }
     }
 

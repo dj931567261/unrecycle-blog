@@ -89,7 +89,7 @@
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
-            transition: all 0.2s ease;
+            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
         }
         .history-action-btn:hover {
             color: var(--text-primary);
@@ -232,7 +232,12 @@
     // Load history from localStorage
     function loadHistory() {
         try {
-            historyData = JSON.parse(localStorage.getItem('hexagram_history') || '[]');
+            const parsed = JSON.parse(localStorage.getItem('hexagram_history') || '[]');
+            historyData = Array.isArray(parsed)
+                ? parsed.filter(item => item && typeof item === 'object' &&
+                    typeof item.type === 'string' && typeof item.input === 'string' &&
+                    typeof item.output === 'string').slice(0, 100)
+                : [];
         } catch (e) {
             historyData = [];
         }
@@ -241,14 +246,35 @@
 
     // Save history data
     function saveHistory() {
-        localStorage.setItem('hexagram_history', JSON.stringify(historyData));
-        renderHistory();
+        try {
+            localStorage.setItem('hexagram_history', JSON.stringify(historyData));
+            renderHistory();
+            return true;
+        } catch (e) {
+            // 超出浏览器存储配额时逐步丢弃最旧记录，避免整个工具失效。
+            while (historyData.length > 1) {
+                historyData.pop();
+                try {
+                    localStorage.setItem('hexagram_history', JSON.stringify(historyData));
+                    renderHistory();
+                    return true;
+                } catch (_) {
+                    // Continue trimming.
+                }
+            }
+            errorBanner.textContent = '❌ 历史记录保存失败：浏览器本地存储空间不足。';
+            errorBanner.style.display = 'block';
+            return false;
+        }
     }
 
     // Add new history record
     function addHistoryRecord(type, input, output) {
         const timestamp = new Date();
-        const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeString = timestamp.toLocaleString([], {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
         
         const newRecord = {
             id: Date.now(),
@@ -374,6 +400,9 @@
                     codecStatus.textContent = '就绪';
                     codecStatus.style.color = 'var(--text-muted)';
                 }, 1500);
+            }).catch(() => {
+                errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+                errorBanner.style.display = 'block';
             });
         }
     };
@@ -436,10 +465,15 @@
         autoConvert();
     });
 
-    // Unicode-safe Base64 encoding without padding
+    // 使用 TextEncoder/TextDecoder 处理 UTF-8，避免已废弃的 escape/unescape。
     function base64Encode(str) {
-        return window.btoa(unescape(encodeURIComponent(str)))
-            .replace(/=+$/, ''); // 移除末尾填充 = 号
+        const bytes = new TextEncoder().encode(str);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return window.btoa(binary).replace(/=+$/, '');
     }
 
     // Unicode-safe Base64 decoding
@@ -449,7 +483,9 @@
         if (padding !== 4) {
             str += '='.repeat(padding);
         }
-        return decodeURIComponent(escape(window.atob(str)));
+        const binary = window.atob(str);
+        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     }
 
     // Encode to Hexagrams
@@ -625,6 +661,9 @@
                 copyBtn.style.borderColor = '';
                 copyBtn.style.color = '';
             }, 1500);
+        }).catch(() => {
+            errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+            errorBanner.style.display = 'block';
         });
     });
 

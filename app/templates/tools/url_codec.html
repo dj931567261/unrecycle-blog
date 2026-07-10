@@ -115,7 +115,8 @@
         }
 
         try {
-            const result = decodeURIComponent(value);
+            // 同时兼容 application/x-www-form-urlencoded 中“+”代表空格的语义。
+            const result = decodeURIComponent(value.replace(/\+/g, ' '));
             textOutput.value = result;
             errorBanner.style.display = 'none';
             codecStatus.textContent = '解码成功';
@@ -155,6 +156,9 @@
                 copyBtn.style.borderColor = '';
                 copyBtn.style.color = '';
             }, 1500);
+        }).catch(() => {
+            errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+            errorBanner.style.display = 'block';
         });
     });
 </script>

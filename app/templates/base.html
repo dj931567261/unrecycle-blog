@@ -9,7 +9,7 @@
     <meta name="description" content="{% block description %}这是我个人的技术博客、常用网址导航与网站收藏夹，用于记录我的技术成长与灵感碎片。{% endblock %}">
     
     <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="/static/css/style.css?v=1.7">
+    <link rel="stylesheet" href="/static/css/style.css?v=1.8">
     
     <!-- Prism.js Syntax Highlighting Theme (Tomorrow Night / Dark) -->
     <link rel="stylesheet" href="/static/css/prism-tomorrow.min.css">
@@ -21,7 +21,12 @@
     <!-- Theme initialization script (runs immediately to prevent flashing) -->
     <script>
         (function() {
-            const savedTheme = localStorage.getItem('theme') || 'dark';
+            let savedTheme = 'dark';
+            try {
+                savedTheme = localStorage.getItem('theme') || 'dark';
+            } catch (error) {
+                savedTheme = 'dark';
+            }
             document.documentElement.setAttribute('data-theme', savedTheme);
         })();
     </script>
@@ -37,7 +42,7 @@
             </a>
             
             <!-- Main Site Nav links -->
-            <nav class="site-nav">
+            <nav id="site-nav" class="site-nav" aria-label="主导航">
                 <ul>
                     <li><a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">首页</a></li>
                     <li><a href="/blog" class="nav-link {% if request.url.path.startswith('/blog') %}active{% endif %}">博客</a></li>
@@ -48,6 +53,10 @@
             
             <!-- Header actions (Search & Admin status) -->
             <div class="nav-actions">
+                <button id="mobile-nav-toggle" class="btn-icon mobile-nav-toggle" type="button"
+                        aria-label="打开导航菜单" aria-controls="site-nav" aria-expanded="false">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
                 <button id="theme-toggle-btn" class="btn-icon" title="切换主题 (明亮 / 暗黑)">
                     <i class="fa-solid fa-sun" id="theme-icon-sun" style="display:none;"></i>
                     <i class="fa-solid fa-moon" id="theme-icon-moon" style="display:none;"></i>
@@ -60,7 +69,7 @@
                     <a href="/admin" class="btn btn-secondary" style="padding: 8px 16px;">
                         <i class="fa-solid fa-sliders"></i> 后台
                     </a>
-                    <button onclick="logoutAdmin()" class="btn btn-danger" style="padding: 8px 16px;">
+                    <button type="button" onclick="logoutAdmin()" class="btn btn-danger nav-auth-action" style="padding: 8px 16px;">
                         <i class="fa-solid fa-right-from-bracket"></i> 退出
                     </button>
                 {% endif %}
@@ -94,8 +103,8 @@
                 <i class="fa-solid fa-keyboard" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
                 <i class="fa-solid fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
             </div>
-            <div id="search-results-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-                <div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>
+            <div id="search-results-container" class="search-results-container" aria-live="polite">
+                <div class="search-status">输入任意内容开始检索...</div>
             </div>
         </div>
     </div>
@@ -131,6 +140,94 @@
         const searchModalClose = document.getElementById('search-modal-close');
         const globalSearchInput = document.getElementById('global-search-input');
         const searchResultsContainer = document.getElementById('search-results-container');
+        const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+        const siteNav = document.getElementById('site-nav');
+        let searchTimer = null;
+        let searchController = null;
+
+        function setSearchStatus(message) {
+            const status = document.createElement('div');
+            status.className = 'search-status';
+            status.textContent = message;
+            searchResultsContainer.replaceChildren(status);
+        }
+
+        function getSafeResultUrl(rawUrl) {
+            const url = String(rawUrl || '').trim();
+            if (!url) return null;
+            try {
+                const parsed = new URL(url, window.location.origin);
+                if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+                return parsed.origin === window.location.origin
+                    ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+                    : parsed.href;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function renderSearchResults(items) {
+            const fragment = document.createDocumentFragment();
+            const iconMap = {
+                '博客': 'fa-book-open',
+                '文章': 'fa-book-open',
+                '导航': 'fa-link',
+                '收藏': 'fa-bookmark',
+                'post': 'fa-book-open',
+                'nav': 'fa-link',
+                'bookmark': 'fa-bookmark'
+            };
+            const typeLabelMap = {
+                'post': '博客',
+                'nav': '导航',
+                'bookmark': '收藏'
+            };
+
+            items.forEach(item => {
+                const safeUrl = getSafeResultUrl(item.url || item.href);
+                if (!safeUrl) return;
+
+                const link = document.createElement('a');
+                link.href = safeUrl;
+                link.className = 'search-result-card';
+
+                const iconWrapper = document.createElement('span');
+                iconWrapper.className = 'search-result-icon';
+                const icon = document.createElement('i');
+                const rawType = String(item.type || item.kind || '内容');
+                const type = typeLabelMap[rawType] || rawType;
+                icon.className = `fa-solid ${iconMap[rawType] || iconMap[type] || 'fa-file-lines'}`;
+                iconWrapper.appendChild(icon);
+
+                const body = document.createElement('span');
+                body.className = 'search-result-body';
+                const typeLabel = document.createElement('span');
+                typeLabel.className = 'search-result-type';
+                typeLabel.textContent = type;
+                const title = document.createElement('span');
+                title.className = 'search-result-title';
+                title.textContent = String(item.title || '未命名内容');
+                const description = document.createElement('span');
+                description.className = 'search-result-description';
+                description.textContent = String(item.description || item.desc || item.summary || '');
+                body.append(typeLabel, title, description);
+
+                const arrow = document.createElement('i');
+                arrow.className = 'fa-solid fa-chevron-right search-result-arrow';
+                link.append(iconWrapper, body, arrow);
+                if (/^https?:\/\//i.test(safeUrl)) {
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                }
+                fragment.appendChild(link);
+            });
+
+            if (!fragment.childNodes.length) {
+                setSearchStatus('未找到匹配内容');
+                return;
+            }
+            searchResultsContainer.replaceChildren(fragment);
+        }
 
         function openSearch() {
             searchModal.classList.add('open');
@@ -140,7 +237,9 @@
         function closeSearch() {
             searchModal.classList.remove('open');
             globalSearchInput.value = '';
-            searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>';
+            if (searchController) searchController.abort();
+            window.clearTimeout(searchTimer);
+            setSearchStatus('输入任意内容开始检索...');
         }
 
         if (searchTriggerBtn) searchTriggerBtn.addEventListener('click', openSearch);
@@ -150,6 +249,35 @@
         searchModal.addEventListener('click', (e) => {
             if (e.target === searchModal) closeSearch();
         });
+
+        function closeMobileNav() {
+            if (!siteNav || !mobileNavToggle) return;
+            siteNav.classList.remove('open');
+            mobileNavToggle.setAttribute('aria-expanded', 'false');
+            mobileNavToggle.setAttribute('aria-label', '打开导航菜单');
+            const icon = mobileNavToggle.querySelector('i');
+            if (icon) icon.className = 'fa-solid fa-bars';
+        }
+
+        if (mobileNavToggle && siteNav) {
+            mobileNavToggle.addEventListener('click', () => {
+                const willOpen = !siteNav.classList.contains('open');
+                closeMobileNav();
+                if (willOpen) {
+                    siteNav.classList.add('open');
+                    mobileNavToggle.setAttribute('aria-expanded', 'true');
+                    mobileNavToggle.setAttribute('aria-label', '关闭导航菜单');
+                    const icon = mobileNavToggle.querySelector('i');
+                    if (icon) icon.className = 'fa-solid fa-xmark';
+                }
+            });
+            siteNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMobileNav));
+            document.addEventListener('click', event => {
+                if (!siteNav.contains(event.target) && !mobileNavToggle.contains(event.target)) {
+                    closeMobileNav();
+                }
+            });
+        }
 
         // Hotkeys for search (Cmd + K / Ctrl + K)
         window.addEventListener('keydown', (e) => {
@@ -164,128 +292,36 @@
             if (e.key === 'Escape' && searchModal.classList.contains('open')) {
                 closeSearch();
             }
+            if (e.key === 'Escape') closeMobileNav();
         });
 
-        // Simple local search matching (navlinks, posts, bookmarks)
-        // In real-world, we can either fetch on keystroke or bundle index once.
-        // For absolute speed, let's query a search endpoint or local database.
-        let searchData = null;
-
-        async function loadSearchData() {
-            if (searchData) return;
-            try {
-                // Fetch search index from page details if we want, or fetch from home endpoints.
-                // We'll simulate search index loading by querying homepage categories, blog and bookmarks.
-                // To keep it simple, we'll implement a small API or fetch once.
-                // Let's create a small search endpoint or construct it locally.
-                // Let's fetch all items.
-                searchData = [];
-                
-                // Let's scrape data from DOM or fetch from endpoints. 
-                // For a robust search, we will fetch blog posts, navlinks, bookmarks.
-                // Let's query APIs or just scrape visible cards from DOM.
-                // As fallback, we can dynamically build this.
-            } catch (err) {
-                console.error("Search data load failed:", err);
-            }
-        }
-
-        globalSearchInput.addEventListener('input', async (e) => {
-            const query = e.target.value.toLowerCase().trim();
+        // Search the complete server-side index so the dialog behaves consistently on every page.
+        globalSearchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            window.clearTimeout(searchTimer);
+            if (searchController) searchController.abort();
             if (!query) {
-                searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">输入任意内容开始检索...</div>';
+                setSearchStatus('输入任意内容开始检索...');
                 return;
             }
-
-            searchResultsContainer.innerHTML = '<div style="text-align:center; padding:16px;"><i class="fa-solid fa-spinner fa-spin"></i> 检索中...</div>';
-
-            // We can search the items dynamically. Since it's server-rendered, 
-            // a very easy way is to fetch search results from backend:
-            try {
-                // We can query a simple API or we search current page elements.
-                // For completeness, let's search elements from the DOM if we are on index page, 
-                // or fetch from db. To make search work on ANY page, let's write a simple client-side search.
-                // We'll scrape cards or fetch:
-                // Let's write a quick client-side DOM parser for index page, and for other pages, fetch.
-                // Better yet: we search dynamically via a lightweight endpoint or scrape local links.
-                // Let's fetch from the index data directly. For now, let's filter what's in the page, 
-                // and we'll implement a robust search handler.
-                
-                // For demo, search items in DOM
-                const items = [];
-                
-                // Scrape navigation cards
-                document.querySelectorAll('.nav-card').forEach(card => {
-                    items.push({
-                        type: '导航',
-                        title: card.querySelector('.nav-card-title').textContent,
-                        url: card.href,
-                        desc: card.querySelector('.nav-card-desc').textContent,
-                        icon: 'fa-link'
+            setSearchStatus('检索中...');
+            searchTimer = window.setTimeout(async () => {
+                searchController = new AbortController();
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+                        headers: { 'Accept': 'application/json' },
+                        signal: searchController.signal
                     });
-                });
-                
-                // Scrape blog posts
-                document.querySelectorAll('.post-card').forEach(card => {
-                    items.push({
-                        type: '博客',
-                        title: card.querySelector('.post-card-title').textContent,
-                        url: card.querySelector('.post-card-title').href,
-                        desc: card.querySelector('.post-card-summary').textContent,
-                        icon: 'fa-book-open'
-                    });
-                });
-
-                // Scrape bookmark items
-                document.querySelectorAll('.bookmark-card').forEach(card => {
-                    items.push({
-                        type: '收藏',
-                        title: card.querySelector('.bookmark-title').textContent,
-                        url: card.querySelector('.bookmark-link-btn').href,
-                        desc: card.querySelector('.bookmark-desc').textContent,
-                        icon: 'fa-bookmark'
-                    });
-                });
-
-                // Filter
-                const filtered = items.filter(item => 
-                    item.title.toLowerCase().includes(query) || 
-                    item.desc.toLowerCase().includes(query)
-                );
-
-                if (filtered.length === 0) {
-                    // Try to fetch from backend if empty or we are not on homepage
-                    searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">未找到匹配内容</div>';
-                    return;
+                    if (!response.ok) throw new Error(`Search request failed: ${response.status}`);
+                    const data = await response.json();
+                    const results = Array.isArray(data) ? data : (data.results || data.items || []);
+                    renderSearchResults(Array.isArray(results) ? results : []);
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        setSearchStatus('搜索服务暂不可用，请稍后重试');
+                    }
                 }
-
-                searchResultsContainer.innerHTML = '';
-                filtered.forEach(item => {
-                    const div = document.createElement('a');
-                    div.href = item.url;
-                    div.className = 'nav-card';
-                    div.style.background = 'rgba(255,255,255,0.03)';
-                    div.style.padding = '12px 16px';
-                    div.style.display = 'flex';
-                    div.style.gap = '14px';
-                    div.style.alignItems = 'center';
-                    div.innerHTML = `
-                        <div class="nav-card-icon" style="width:30px; height:30px; font-size:14px;">
-                            <i class="fa-solid ${item.icon}"></i>
-                        </div>
-                        <div style="flex-grow:1; min-width:0;">
-                            <div style="font-size:12px; color:var(--accent-blue); font-weight:600; text-transform:uppercase;">${item.type}</div>
-                            <div style="font-size:14px; font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</div>
-                            <div style="font-size:11px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.desc}</div>
-                        </div>
-                        <i class="fa-solid fa-chevron-right" style="font-size:12px; color:var(--text-muted);"></i>
-                    `;
-                    searchResultsContainer.appendChild(div);
-                });
-
-            } catch (err) {
-                searchResultsContainer.innerHTML = '<div class="text-muted" style="text-align: center; padding: 24px; font-size: 14px;">搜索出错</div>';
-            }
+            }, 220);
         });
 
         // Theme switching handler with DOMContentLoaded safety
@@ -313,7 +349,11 @@
                 const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
                 document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
+                try {
+                    localStorage.setItem('theme', newTheme);
+                } catch (error) {
+                    console.warn('无法保存主题偏好:', error);
+                }
                 updateThemeUI(newTheme);
             });
         });

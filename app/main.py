@@ -1,69 +1,118 @@
+import html
+import logging
+import math
 import os
-import shutil
-from typing import List, Optional
-from pydantic import BaseModel
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Form, File, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+import re
+import tempfile
+import time
+import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime
+from html.parser import HTMLParser
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urlsplit
+
+import markdown
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import TemplateNotFound
+from sqlalchemy import inspect, or_, text
 from sqlalchemy.orm import Session
-import markdown
+from starlette.concurrency import run_in_threadpool
 
-from app import crud, models, schemas, auth
-from app.database import engine, Base, get_db
-from app.config import UPLOAD_DIR, ADMIN_USERNAME
+from app import auth, crud, models, schemas
+from app.config import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    APP_ENV,
+    COOKIE_NAME,
+    COOKIE_SAMESITE,
+    COOKIE_SECURE,
+    ENABLE_DOCS,
+    MAX_UPLOAD_BYTES,
+    RUN_LEGACY_COMPAT_MIGRATION,
+    SEED_INITIAL_DATA,
+    STATIC_DIR,
+    TEMPLATE_DIR,
+    UPLOAD_CHUNK_SIZE,
+    UPLOAD_DIR,
+)
+from app.database import Base, SessionLocal, engine, get_db
 
-# Initialize database tables
-Base.metadata.create_all(bind=engine)
 
-# Run SQLite migrations for Game config columns
-from sqlalchemy import inspect, text
-inspector = inspect(engine)
-try:
-    columns = [c["name"] for c in inspector.get_columns("games")]
-    if "drop_enabled" not in columns:
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE games ADD COLUMN drop_enabled BOOLEAN DEFAULT 0"))
-            conn.execute(text("ALTER TABLE games ADD COLUMN code_stock INTEGER DEFAULT 0"))
-            conn.execute(text("ALTER TABLE games ADD COLUMN drop_probability FLOAT DEFAULT 0.2"))
-            conn.commit()
-except Exception as e:
-    print(f"⚠️ Migration failed: {e}")
+logger = logging.getLogger("unrecycle_me")
+UPLOAD_PUBLIC_PREFIX = (
+    "/static/uploads"
+    if UPLOAD_DIR == (STATIC_DIR / "uploads").resolve()
+    else "/uploads"
+)
 
-app = FastAPI(title="Unrecycle-Me", description="Personal Developer Dashboard & Blog")
 
-import time
-@app.middleware("http")
-async def log_request_time(request: Request, call_next):
-    start = time.time()
-    response = await call_next(request)
-    duration = time.time() - start
-    print(f"⌛ [PROFILER] Request to {request.url.path} took {duration:.4f} seconds")
-    return response
+LEGACY_GAME_COLUMNS = {
+    "drop_enabled": "ALTER TABLE games ADD COLUMN drop_enabled BOOLEAN NOT NULL DEFAULT 0",
+    "code_stock": "ALTER TABLE games ADD COLUMN code_stock INTEGER NOT NULL DEFAULT 0",
+    "drop_probability": "ALTER TABLE games ADD COLUMN drop_probability FLOAT NOT NULL DEFAULT 0.2",
+}
 
-# Auto-seed database with initial content on startup
-from app.database import SessionLocal
-@app.on_event("startup")
-def seed_initial_data():
+
+def run_legacy_compatibility_migration() -> list[str]:
+    """显式的一次性旧 games 表兼容迁移。
+
+    默认启动不会执行 ALTER TABLE。需要兼容旧库时，先备份数据库，再单进程设置
+    RUN_LEGACY_COMPAT_MIGRATION=true 启动一次，或直接调用本函数。
+    """
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError("Legacy compatibility migration currently supports SQLite only")
+
+    inspector = inspect(engine)
+    if not inspector.has_table("games"):
+        return []
+
+    migrated_columns: list[str] = []
+    with engine.begin() as connection:
+        existing_columns = {
+            column["name"] for column in inspect(connection).get_columns("games")
+        }
+        for column_name, ddl in LEGACY_GAME_COLUMNS.items():
+            if column_name in existing_columns:
+                continue
+            connection.execute(text(ddl))
+            existing_columns.add(column_name)
+            migrated_columns.append(column_name)
+    return migrated_columns
+
+
+def seed_initial_data() -> None:
+    """在单个事务中为全空业务表写入默认内容。
+
+    SQLite 使用 BEGIN IMMEDIATE 串行化多个进程的首次初始化，避免 count/insert 竞态。
+    已有任意数据的表不会被补种或覆盖。
+    """
     db = SessionLocal()
     try:
-        # Check and seed NavLinks
+        if engine.dialect.name == "sqlite":
+            db.execute(text("BEGIN IMMEDIATE"))
+        else:
+            db.begin()
+
         if db.query(models.NavLink).count() == 0:
-            nav_links = [
-                models.NavLink(title="FastAPI 文档", url="https://fastapi.tiangolo.com", description="Python 现代 Web 框架官方中文文档", category="技术文档", icon="⚡", order=1),
-                models.NavLink(title="MDN Web", url="https://developer.mozilla.org/zh-CN", description="最权威的 Web 前端开发技术参考资料", category="技术文档", icon="📖", order=2),
-                models.NavLink(title="GitHub", url="https://github.com", description="全球开源代码托管与协作开发社区", category="常用网址", icon="🐙", order=1),
-                models.NavLink(title="Can I Use", url="https://caniuse.com", description="前端浏览器兼容性查询工具", category="常用网址", icon="🌐", order=2),
-            ]
-            db.add_all(nav_links)
-            db.commit()
-            
-        # Check and seed Posts
+            db.add_all(
+                [
+                    models.NavLink(title="FastAPI 文档", url="https://fastapi.tiangolo.com", description="Python 现代 Web 框架官方中文文档", category="技术文档", icon="⚡", order=1),
+                    models.NavLink(title="MDN Web", url="https://developer.mozilla.org/zh-CN", description="最权威的 Web 前端开发技术参考资料", category="技术文档", icon="📖", order=2),
+                    models.NavLink(title="GitHub", url="https://github.com", description="全球开源代码托管与协作开发社区", category="常用网址", icon="🐙", order=1),
+                    models.NavLink(title="Can I Use", url="https://caniuse.com", description="前端浏览器兼容性查询工具", category="常用网址", icon="🌐", order=2),
+                ]
+            )
+
         if db.query(models.Post).count() == 0:
-            first_post = models.Post(
-                title="我的个人空间 Unrecycle-Me 正式发布！",
-                slug="unrecycle-me-released",
-                content="""欢迎来到我的个人数字花园！
+            db.add(
+                models.Post(
+                    title="我的个人空间 Unrecycle-Me 正式发布！",
+                    slug="unrecycle-me-released",
+                    content="""欢迎来到我的个人数字花园！
 
 这个系统是我专门设计用来管理我的**技术文章**、**网址导航**、**网站收藏**以及**日常小工具**的平台。
 
@@ -79,199 +128,561 @@ def seed_initial_data():
 
 如果你对这个项目感兴趣，欢迎在管理后台中管理或修改内容！
 """,
-                summary="这是我使用 FastAPI 和 SQLite 自主开发并搭建的个人主页与技术博客，集成了导航、书签和工具箱。",
-                category="日常记录",
-                tags="FastAPI,SQLite,Blog",
-                is_published=True
+                    summary="这是我使用 FastAPI 和 SQLite 自主开发并搭建的个人主页与技术博客，集成了导航、书签和工具箱。",
+                    category="日常记录",
+                    tags="FastAPI,SQLite,Blog",
+                    is_published=True,
+                )
             )
-            db.add(first_post)
-            db.commit()
-            
-        # Check and seed Bookmarks
+
         if db.query(models.Bookmark).count() == 0:
-            bookmarks = [
-                models.Bookmark(title="Prism.js - 轻量级代码语法高亮工具", url="https://prismjs.com", description="一个非常小巧、速度极快的客户端代码高亮库，本站的技术文章代码块就是用它高亮渲染的。", tags="Frontend,Tools"),
-                models.Bookmark(title="FastAPI - Official Documentation", url="https://fastapi.tiangolo.com", description="FastAPI standard doc site", tags="Backend,Python")
-            ]
-            db.add_all(bookmarks)
-            db.commit()
+            db.add_all(
+                [
+                    models.Bookmark(title="Prism.js - 轻量级代码语法高亮工具", url="https://prismjs.com", description="一个非常小巧、速度极快的客户端代码高亮库，本站的技术文章代码块就是用它高亮渲染的。", tags="Frontend,Tools"),
+                    models.Bookmark(title="FastAPI - Official Documentation", url="https://fastapi.tiangolo.com", description="FastAPI standard doc site", tags="Backend,Python"),
+                ]
+            )
 
-        # Check and seed Games (Delete all since game center is removed)
-        db.query(models.RedemptionCode).delete()
-        db.query(models.Game).delete()
         db.commit()
-
-
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
-# Ensure static and template directories exist
-os.makedirs("app/static", exist_ok=True)
-os.makedirs("app/static/css", exist_ok=True)
-os.makedirs("app/static/js", exist_ok=True)
-os.makedirs("app/templates", exist_ok=True)
 
-# Mount static files with browser cache headers (Cache-Control)
+def initialize_database() -> None:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    Base.metadata.create_all(bind=engine)
+    if RUN_LEGACY_COMPAT_MIGRATION:
+        migrated = run_legacy_compatibility_migration()
+        logger.info("Legacy compatibility migration completed: %s", migrated or "no changes")
+    if SEED_INITIAL_DATA:
+        seed_initial_data()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await run_in_threadpool(initialize_database)
+    yield
+
+
+app = FastAPI(
+    title="Unrecycle-Me",
+    description="Personal Developer Dashboard & Blog",
+    docs_url="/docs" if ENABLE_DOCS else None,
+    redoc_url="/redoc" if ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_DOCS else None,
+    lifespan=lifespan,
+)
+
+
+def _same_origin(origin: str, request: Request) -> bool:
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    request_host = request.headers.get("host", "").lower()
+    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() == request_host
+
+
+def _apply_security_headers(response, request: Request) -> None:
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "base-uri 'self'; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.bootcdn.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "font-src 'self' data:; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self'",
+    )
+    if COOKIE_SECURE:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    if request.url.path.startswith(("/admin", "/login", "/api/auth")):
+        response.headers["Cache-Control"] = "no-store"
+
+
+@app.middleware("http")
+async def security_and_timing_middleware(request: Request, call_next):
+    started_at = time.perf_counter()
+
+    # 无需改模板的基础 CSRF 防线：Cookie 鉴权的写请求拒绝明确的跨站来源。
+    uses_cookie_auth = COOKIE_NAME in request.cookies and not request.headers.get("Authorization")
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and uses_cookie_auth:
+        fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
+        origin = request.headers.get("Origin")
+        if fetch_site == "cross-site" or (origin and not _same_origin(origin, request)):
+            response = JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Cross-site request rejected"},
+            )
+            _apply_security_headers(response, request)
+            return response
+
+    try:
+        response = await call_next(request)
+    finally:
+        duration = time.perf_counter() - started_at
+        logger.info("Request %s %s completed in %.4fs", request.method, request.url.path, duration)
+
+    _apply_security_headers(response, request)
+    return response
+
+
+@app.exception_handler(crud.DataConflictError)
+async def data_conflict_handler(_request: Request, exc: crud.DataConflictError):
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": str(exc)},
+    )
+
+
 class CachedStaticFiles(StaticFiles):
     def file_response(self, *args, **kwargs):
         response = super().file_response(*args, **kwargs)
-        response.headers["Cache-Control"] = "public, max-age=604800"
+        response.headers["Cache-Control"] = "public, max-age=3600, must-revalidate"
+        response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
-app.mount("/static", CachedStaticFiles(directory="app/static"), name="static")
 
-# Configure templates
-templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", CachedStaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount(
+    "/uploads",
+    CachedStaticFiles(directory=str(UPLOAD_DIR), check_dir=False),
+    name="uploads",
+)
 
-def render_markdown(text: str) -> str:
-    if not text:
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+
+
+_ALLOWED_TAGS = {
+    "a", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3",
+    "h4", "h5", "h6", "hr", "img", "li", "ol", "p", "pre", "s", "strong",
+    "table", "tbody", "td", "th", "thead", "tr", "ul",
+}
+_VOID_TAGS = {"br", "hr", "img"}
+_BLOCKED_TAGS = {"script", "style", "iframe", "object", "embed", "svg", "math", "template", "noscript"}
+_GLOBAL_ATTRIBUTES = {"title"}
+_TAG_ATTRIBUTES = {
+    "a": {"href"},
+    "img": {"src", "alt", "width", "height"},
+    "code": {"class"},
+    "div": {"class"},
+    "h1": {"id"}, "h2": {"id"}, "h3": {"id"},
+    "h4": {"id"}, "h5": {"id"}, "h6": {"id"},
+    "ol": {"start"},
+    "li": {"value"},
+    "td": {"align"},
+    "th": {"align"},
+}
+_SAFE_CLASS_RE = re.compile(r"^[a-zA-Z0-9_ -]{1,200}$")
+_SAFE_ID_RE = re.compile(r"^[\w:.-]{1,200}$", re.UNICODE)
+
+
+def _sanitize_content_url(value: str, *, image: bool = False) -> Optional[str]:
+    decoded = html.unescape(value).strip()
+    if not decoded or decoded.startswith(("//", "\\")):
+        return None
+    if any(ord(character) < 32 or character.isspace() for character in decoded):
+        return None
+
+    parsed = urlsplit(decoded)
+    if parsed.scheme:
+        allowed_schemes = {"http", "https"} if image else {"http", "https", "mailto"}
+        if parsed.scheme.lower() not in allowed_schemes:
+            return None
+        if parsed.scheme.lower() in {"http", "https"} and not parsed.netloc:
+            return None
+    return decoded
+
+
+class MarkdownHTMLSanitizer(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.output: list[str] = []
+        self.open_tags: list[str] = []
+        self.blocked_depth = 0
+
+    def handle_starttag(self, tag: str, attrs):
+        tag = tag.lower()
+        if self.blocked_depth:
+            self.blocked_depth += 1
+            return
+        if tag in _BLOCKED_TAGS:
+            self.blocked_depth = 1
+            return
+        if tag not in _ALLOWED_TAGS:
+            return
+
+        cleaned_attributes: list[tuple[str, str]] = []
+        allowed_attributes = _GLOBAL_ATTRIBUTES | _TAG_ATTRIBUTES.get(tag, set())
+        for raw_name, raw_value in attrs:
+            name = raw_name.lower()
+            if raw_value is None or name.startswith("on"):
+                continue
+
+            if name == "style" and tag in {"td", "th"}:
+                match = re.fullmatch(r"\s*text-align\s*:\s*(left|right|center)\s*;?\s*", raw_value, re.I)
+                if match:
+                    cleaned_attributes.append(("align", match.group(1).lower()))
+                continue
+            if name not in allowed_attributes:
+                continue
+
+            value = raw_value.strip()
+            if name in {"href", "src"}:
+                safe_url = _sanitize_content_url(value, image=name == "src")
+                if safe_url is None:
+                    continue
+                value = safe_url
+            elif name == "class":
+                if not _SAFE_CLASS_RE.fullmatch(value):
+                    continue
+            elif name == "id":
+                if not _SAFE_ID_RE.fullmatch(value):
+                    continue
+            elif name in {"width", "height", "start", "value"}:
+                if not value.isdigit() or int(value) > 10_000:
+                    continue
+            elif name == "align":
+                value = value.lower()
+                if value not in {"left", "right", "center"}:
+                    continue
+            cleaned_attributes.append((name, value))
+
+        if tag == "a":
+            href = next((value for name, value in cleaned_attributes if name == "href"), None)
+            if href and urlsplit(href).scheme in {"http", "https"}:
+                cleaned_attributes.extend(
+                    [("target", "_blank"), ("rel", "noopener noreferrer")]
+                )
+
+        attributes_text = "".join(
+            f' {name}="{html.escape(value, quote=True)}"'
+            for name, value in cleaned_attributes
+        )
+        self.output.append(f"<{tag}{attributes_text}>")
+        if tag not in _VOID_TAGS:
+            self.open_tags.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs):
+        self.handle_starttag(tag, attrs)
+        if self.blocked_depth:
+            self.blocked_depth = max(0, self.blocked_depth - 1)
+        elif self.open_tags and self.open_tags[-1] == tag.lower():
+            self.open_tags.pop()
+            self.output.append(f"</{tag.lower()}>")
+
+    def handle_endtag(self, tag: str):
+        tag = tag.lower()
+        if self.blocked_depth:
+            self.blocked_depth -= 1
+            return
+        if tag in _VOID_TAGS or not self.open_tags or self.open_tags[-1] != tag:
+            return
+        self.open_tags.pop()
+        self.output.append(f"</{tag}>")
+
+    def handle_data(self, data: str):
+        if not self.blocked_depth:
+            self.output.append(html.escape(data, quote=False))
+
+    def handle_entityref(self, name: str):
+        if not self.blocked_depth:
+            self.output.append(f"&{name};")
+
+    def handle_charref(self, name: str):
+        if not self.blocked_depth:
+            self.output.append(f"&#{name};")
+
+    def get_html(self) -> str:
+        while self.open_tags:
+            self.output.append(f"</{self.open_tags.pop()}>")
+        return "".join(self.output)
+
+
+def sanitize_markdown_html(rendered_html: str) -> str:
+    sanitizer = MarkdownHTMLSanitizer()
+    sanitizer.feed(rendered_html)
+    sanitizer.close()
+    return sanitizer.get_html()
+
+
+def render_markdown(value: str) -> str:
+    if not value:
         return ""
-    
-    # Preprocess markdown to align with marked.js behavior:
-    # 1. Normalize 2-space or 3-space list indentation to 4-space multiples
-    # 2. Ensure blank line before lists that follow paragraph text
-    import re
-    lines = text.splitlines()
-    new_lines = []
-    list_item_pattern = re.compile(r'^\s*([-*+]|\d+\.)\s+')
-    
-    for i, line in enumerate(lines):
-        # Normalize nested list indentation
-        indent_match = re.match(r'^(\s*)([-*+]|\d+\.)(\s+)(.*)', line)
+
+    lines = value.splitlines()
+    new_lines: list[str] = []
+    list_item_pattern = re.compile(r"^\s*([-*+]|\d+\.)\s+")
+    for index, line in enumerate(lines):
+        indent_match = re.match(r"^(\s*)([-*+]|\d+\.)(\s+)(.*)", line)
         processed_line = line
         if indent_match:
             spaces, bullet, post_spaces, content = indent_match.groups()
-            num_spaces = len(spaces)
-            if num_spaces > 0:
-                new_num_spaces = ((num_spaces + 2) // 4) * 4
-                if new_num_spaces == 0:
-                    new_num_spaces = 4
-                processed_line = ' ' * new_num_spaces + bullet + post_spaces + content
-        
-        # Insert blank line if current line is a list item and previous line is non-empty/non-list
-        if i > 0:
-            prev_line = lines[i-1].strip()
-            if list_item_pattern.match(processed_line) and prev_line:
-                # Check that prev_line is not already a list item or other common block markers
-                if not list_item_pattern.match(prev_line) and not prev_line.startswith(('#', '>', '`', '- ', '* ', '+ ')):
-                    new_lines.append("")
-                    
-        new_lines.append(processed_line)
-        
-    preprocessed_text = "\n".join(new_lines)
-    
-    # Extensions: fenced_code (code blocks), tables, toc (table of contents)
-    return markdown.markdown(preprocessed_text, extensions=['fenced_code', 'tables', 'toc', 'nl2br'])
+            if spaces:
+                new_indent = max(4, ((len(spaces) + 2) // 4) * 4)
+                processed_line = " " * new_indent + bullet + post_spaces + content
 
-# Add markdown filter to Jinja2
+        if index > 0:
+            previous_line = lines[index - 1].strip()
+            if list_item_pattern.match(processed_line) and previous_line:
+                if not list_item_pattern.match(previous_line) and not previous_line.startswith(("#", ">", "`", "- ", "* ", "+ ")):
+                    new_lines.append("")
+        new_lines.append(processed_line)
+
+    rendered = markdown.markdown(
+        "\n".join(new_lines),
+        extensions=["fenced_code", "tables", "toc", "nl2br"],
+    )
+    return sanitize_markdown_html(rendered)
+
+
 templates.env.filters["markdown"] = render_markdown
 
-# Add template helper to format dates
-def format_datetime(value, format="%Y-%m-%d"):
+
+def format_datetime(value, date_format: str = "%Y-%m-%d"):
     if not value:
         return ""
     if isinstance(value, str):
-        from datetime import datetime
-        # Try parsing standard formats first
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        for known_format in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
             try:
-                return datetime.strptime(value, fmt).strftime(format)
+                return datetime.strptime(value, known_format).strftime(date_format)
             except ValueError:
                 continue
-        # If parsing fails, fall back to extracting the date prefix if it looks like a date
         if len(value) >= 10 and value[4] == "-" and value[7] == "-":
             return value[:10]
         return value
     try:
-        return value.strftime(format)
+        return value.strftime(date_format)
     except AttributeError:
         return str(value)
+
 
 templates.env.filters["datetime"] = format_datetime
 
 
+def _pagination(page: int, page_size: int, total: int) -> dict:
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": max(1, math.ceil(total / page_size)),
+    }
 
-# ---------------- PAGE ROUTES (HTML) ----------------
+
+def _clamp_page(page: int, page_size: int, total: int) -> int:
+    """将用户传入的页码限制在当前有效范围内。"""
+    return min(page, max(1, math.ceil(total / page_size)))
+
+
+@app.get("/healthz", include_in_schema=False)
+def health_check(db: Session = Depends(get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "environment": APP_ENV}
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@app.get("/api/search")
+def api_search(
+    q: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(12, ge=1, le=30),
+    db: Session = Depends(get_db),
+):
+    keyword = q.strip()
+    if not keyword:
+        raise HTTPException(status_code=422, detail="Search query must not be empty")
+
+    pattern = f"%{_escape_like(keyword)}%"
+    results: list[dict] = []
+
+    posts = (
+        db.query(models.Post)
+        .filter(
+            models.Post.is_published.is_(True),
+            or_(
+                models.Post.title.ilike(pattern, escape="\\"),
+                models.Post.summary.ilike(pattern, escape="\\"),
+                models.Post.category.ilike(pattern, escape="\\"),
+                models.Post.tags.ilike(pattern, escape="\\"),
+            ),
+        )
+        .order_by(models.Post.created_at.desc(), models.Post.id.desc())
+        .limit(limit)
+        .all()
+    )
+    results.extend(
+        {
+            "type": "post",
+            "title": post.title,
+            "url": f"/blog/{post.slug}",
+            "description": post.summary or post.category,
+            "icon": "📄",
+        }
+        for post in posts
+    )
+
+    if len(results) < limit:
+        nav_limit = limit - len(results)
+        nav_links = (
+            db.query(models.NavLink)
+            .filter(
+                or_(
+                    models.NavLink.title.ilike(pattern, escape="\\"),
+                    models.NavLink.description.ilike(pattern, escape="\\"),
+                    models.NavLink.category.ilike(pattern, escape="\\"),
+                )
+            )
+            .order_by(models.NavLink.order.asc(), models.NavLink.title.asc())
+            .limit(nav_limit)
+            .all()
+        )
+        results.extend(
+            {
+                "type": "nav",
+                "title": link.title,
+                "url": link.url,
+                "description": link.description or link.category,
+                "icon": link.icon or "🧭",
+            }
+            for link in nav_links
+        )
+
+    if len(results) < limit:
+        bookmark_limit = limit - len(results)
+        bookmarks = (
+            db.query(models.Bookmark)
+            .filter(
+                or_(
+                    models.Bookmark.title.ilike(pattern, escape="\\"),
+                    models.Bookmark.description.ilike(pattern, escape="\\"),
+                    models.Bookmark.tags.ilike(pattern, escape="\\"),
+                )
+            )
+            .order_by(models.Bookmark.created_at.desc(), models.Bookmark.id.desc())
+            .limit(bookmark_limit)
+            .all()
+        )
+        results.extend(
+            {
+                "type": "bookmark",
+                "title": bookmark.title,
+                "url": bookmark.url,
+                "description": bookmark.description or bookmark.tags,
+                "icon": "🔖",
+            }
+            for bookmark in bookmarks
+        )
+
+    return {"query": keyword, "results": results, "count": len(results)}
+
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+def home(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
     nav_links = crud.get_nav_links(db)
     recent_posts = crud.get_posts(db, limit=5, published_only=True)
     bookmarks = crud.get_bookmarks(db, limit=6)
-    
-    # Group nav links by category
     categorized_links = {}
     for link in nav_links:
         categorized_links.setdefault(link.category, []).append(link)
-        
     return templates.TemplateResponse(request, "index.html", {
         "categorized_links": categorized_links,
         "recent_posts": recent_posts,
         "bookmarks": bookmarks,
-        "is_admin": current_user is not None
+        "is_admin": current_user is not None,
     })
+
 
 @app.get("/blog", response_class=HTMLResponse)
-async def blog_list(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    posts = crud.get_posts(db, published_only=(current_user is None))
+def blog_list(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: Optional[str] = Depends(auth.get_current_user_optional),
+):
+    published_only = current_user is None
+    total = crud.count_posts(db, published_only=published_only)
+    page = _clamp_page(page, page_size, total)
+    posts = crud.get_posts(db, skip=(page - 1) * page_size, limit=page_size, published_only=published_only)
     return templates.TemplateResponse(request, "blog_list.html", {
         "posts": posts,
-        "is_admin": current_user is not None
+        "is_admin": current_user is not None,
+        "pagination": _pagination(page, page_size, total),
     })
+
 
 @app.get("/blog/{slug}", response_class=HTMLResponse)
-async def blog_detail(request: Request, slug: str, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+def blog_detail(request: Request, slug: str, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
     post = crud.get_post_by_slug(db, slug)
-    if not post:
+    if not post or (current_user is None and post.is_published is not True):
         raise HTTPException(status_code=404, detail="Article not found")
-        
-    # Increment view count if not admin
-    if not current_user:
-        crud.increment_post_views(db, post.id)
-        
+    if current_user is None:
+        post = crud.increment_post_views(db, post.id)
     return templates.TemplateResponse(request, "blog_detail.html", {
         "post": post,
-        "is_admin": current_user is not None
+        "is_admin": current_user is not None,
     })
 
+
 @app.get("/bookmarks", response_class=HTMLResponse)
-async def bookmarks_list(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    bookmarks = crud.get_bookmarks(db, limit=100)
-    
-    # Extract unique tags from bookmarks
-    all_tags = set()
-    for b in bookmarks:
-        if b.tags:
-            for t in b.tags.split(','):
-                cleaned = t.strip()
-                if cleaned:
-                    all_tags.add(cleaned)
-    sorted_tags = sorted(list(all_tags))
-    
+def bookmarks_list(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    tag: Optional[str] = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+    current_user: Optional[str] = Depends(auth.get_current_user_optional),
+):
+    tags = crud.get_all_bookmark_tags(db)
+    requested_tag = tag.strip() if tag else None
+    selected_tag = next(
+        (existing_tag for existing_tag in tags if existing_tag.casefold() == requested_tag.casefold()),
+        requested_tag,
+    ) if requested_tag else None
+    bookmarks, total, page = crud.get_bookmarks_page(
+        db,
+        page=page,
+        page_size=page_size,
+        tag=selected_tag,
+    )
     return templates.TemplateResponse(request, "bookmarks.html", {
         "bookmarks": bookmarks,
         "is_admin": current_user is not None,
-        "tags": sorted_tags
+        "tags": tags,
+        "selected_tag": selected_tag,
+        "pagination": _pagination(page, page_size, total),
     })
+
 
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_list_page(request: Request, current_user: Optional[str] = Depends(auth.get_current_user_optional)):
-    return templates.TemplateResponse(request, "tools_list.html", {
-        "is_admin": current_user is not None
-    })
+    return templates.TemplateResponse(request, "tools_list.html", {"is_admin": current_user is not None})
+
 
 @app.get("/tools/{tool_name}", response_class=HTMLResponse)
 async def render_tool(request: Request, tool_name: str, current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+    if not re.fullmatch(r"[a-z0-9-]{1,64}", tool_name):
+        raise HTTPException(status_code=404, detail="Tool not found")
     template_file = f"tools/{tool_name.replace('-', '_')}.html"
     try:
-        # Try to locate the template, if it exists serve it
         templates.get_template(template_file)
-        return templates.TemplateResponse(request, template_file, {
-            "is_admin": current_user is not None
-        })
-    except Exception:
+    except TemplateNotFound:
         raise HTTPException(status_code=404, detail="Tool not found")
-
+    return templates.TemplateResponse(request, template_file, {"is_admin": current_user is not None})
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -280,179 +691,262 @@ async def login_page(request: Request, current_user: Optional[str] = Depends(aut
         return RedirectResponse(url="/admin", status_code=303)
     return templates.TemplateResponse(request, "login.html", {})
 
+
+def _model_to_dict(obj):
+    result = {}
+    for column in obj.__table__.columns:
+        value = getattr(obj, column.name)
+        result[column.name] = value.strftime("%Y-%m-%d %H:%M:%S") if isinstance(value, datetime) else value
+    return result
+
+
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request, db: Session = Depends(get_db), current_user: Optional[str] = Depends(auth.get_current_user_optional)):
+def admin_page(
+    request: Request,
+    post_page: int = Query(1, ge=1),
+    bookmark_page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: Optional[str] = Depends(auth.get_current_user_optional),
+):
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
-    import traceback
     try:
-        posts = crud.get_posts(db, published_only=False)
+        post_total = crud.count_posts(db, published_only=False)
+        bookmark_total = crud.count_bookmarks(db)
+        post_page = _clamp_page(post_page, page_size, post_total)
+        bookmark_page = _clamp_page(bookmark_page, page_size, bookmark_total)
+        posts = crud.get_posts(db, skip=(post_page - 1) * page_size, limit=page_size, published_only=False)
         nav_links = crud.get_nav_links(db)
-        bookmarks = crud.get_bookmarks(db, limit=100)
-        
-        # Convert SQLAlchemy models to dictionaries so Jinja2's tojson filter can serialize them safely
-        from datetime import datetime
-        def model_to_dict(obj):
-            if not obj:
-                return {}
-            d = {}
-            for c in obj.__table__.columns:
-                val = getattr(obj, c.name)
-                if isinstance(val, datetime):
-                    d[c.name] = val.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    d[c.name] = val
-            return d
+        bookmarks = crud.get_bookmarks(db, skip=(bookmark_page - 1) * page_size, limit=page_size)
 
-        posts_data = [model_to_dict(p) for p in posts]
-        nav_links_data = [model_to_dict(n) for n in nav_links]
-        bookmarks_data = [model_to_dict(b) for b in bookmarks]
-        
-        # Get unique navigation categories with common defaults
         default_categories = ["常用网址", "技术文档", "开发工具", "设计资源"]
-        existing_categories = [n.category for n in nav_links if n.category]
-        nav_categories = sorted(list(set(default_categories + existing_categories)))
-        
-        # Get unique bookmark tags
-        b_tags = set()
-        for b in bookmarks:
-            if b.tags:
-                for t in b.tags.split(','):
-                    cleaned = t.strip()
-                    if cleaned:
-                        b_tags.add(cleaned)
-        sorted_bookmark_tags = sorted(list(b_tags))
-
+        nav_categories = sorted(set(default_categories + [link.category for link in nav_links if link.category]))
+        bookmark_tags = crud.get_all_bookmark_tags(db)
         return templates.TemplateResponse(request, "admin.html", {
-            "posts": posts_data,
-            "nav_links": nav_links_data,
-            "bookmarks": bookmarks_data,
+            "posts": [_model_to_dict(post) for post in posts],
+            "nav_links": [_model_to_dict(link) for link in nav_links],
+            "bookmarks": [_model_to_dict(bookmark) for bookmark in bookmarks],
             "redemption_codes": [],
             "games": [],
             "username": current_user,
             "nav_categories": nav_categories,
-            "bookmark_tags": sorted_bookmark_tags
+            "bookmark_tags": bookmark_tags,
+            "post_pagination": _pagination(post_page, page_size, post_total),
+            "bookmark_pagination": _pagination(bookmark_page, page_size, bookmark_total),
         })
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(f"❌ [ADMIN PAGE ERROR]\n{tb}")
-        return HTMLResponse(content=f"<h3>Admin Page Error (Debug)</h3><pre>{tb}</pre>", status_code=500)
+    except Exception:
+        logger.exception("Failed to render admin page")
+        return HTMLResponse(content="<h3>管理后台暂时不可用，请稍后重试。</h3>", status_code=500)
 
 
-# ---------------- API ROUTES (JSON) ----------------
-
-# Authentication APIs
 @app.post("/api/auth/login")
-async def api_login(form_data: schemas.UserLogin, db: Session = Depends(get_db)):
-    if not auth.verify_admin_credentials(form_data.username, form_data.password):
+async def api_login(request: Request, form_data: schemas.UserLogin):
+    rate_limit_key = auth.build_login_rate_limit_key(request, form_data.username)
+    retry_after = auth.get_login_retry_after(rate_limit_key)
+    if retry_after:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
         )
-    access_token = auth.create_access_token(data={"sub": form_data.username})
-    
-    # Return JSON response and set cookie
-    res = JSONResponse(content={"message": "Login successful", "access_token": access_token})
-    res.set_cookie(
-        key="access_token",
+
+    credentials_valid = await run_in_threadpool(
+        auth.verify_admin_credentials,
+        form_data.username,
+        form_data.password,
+    )
+    if not credentials_valid:
+        auth.record_login_failure(rate_limit_key)
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    auth.clear_login_failures(rate_limit_key)
+    access_token = auth.create_access_token({"sub": form_data.username})
+    response = JSONResponse(content={"message": "Login successful"})
+    response.set_cookie(
+        key=COOKIE_NAME,
         value=access_token,
         httponly=True,
-        max_age=3600 * 24 * 7,  # 7 days
-        samesite="lax",
-        secure=False  # Set to True in production with HTTPS
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        path="/",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
-    return res
+    return response
+
 
 @app.post("/api/auth/logout")
-async def api_logout():
-    res = JSONResponse(content={"message": "Logged out successfully"})
-    res.delete_cookie("access_token")
-    return res
+async def api_logout(request: Request):
+    token = auth.get_request_token(request)
+    if token:
+        auth.revoke_access_token(token)
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie(
+        COOKIE_NAME,
+        path="/",
+        secure=COOKIE_SECURE,
+        httponly=True,
+        samesite=COOKIE_SAMESITE,
+    )
+    return response
 
 
-# Post APIs
-@app.post("/api/posts", response_model=schemas.PostInDB)
-async def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    existing = crud.get_post_by_slug(db, post.slug)
-    if existing:
-        raise HTTPException(status_code=400, detail="Slug already exists")
+@app.post("/api/posts", response_model=schemas.PostInDB, status_code=status.HTTP_201_CREATED)
+def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+    if crud.get_post_by_slug(db, post.slug):
+        raise HTTPException(status_code=409, detail="Slug already exists")
     return crud.create_post(db, post)
 
+
 @app.put("/api/posts/{post_id}", response_model=schemas.PostInDB)
-async def update_post(post_id: int, post_update: schemas.PostUpdate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    # Check if slug is taken by another post
+def update_post(post_id: int, post_update: schemas.PostUpdate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
     if post_update.slug:
         existing = crud.get_post_by_slug(db, post_update.slug)
         if existing and existing.id != post_id:
-            raise HTTPException(status_code=400, detail="Slug already exists")
-            
+            raise HTTPException(status_code=409, detail="Slug already exists")
     updated = crud.update_post(db, post_id, post_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Post not found")
     return updated
 
+
 @app.delete("/api/posts/{post_id}")
-async def delete_post(post_id: int, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    success = crud.delete_post(db, post_id)
-    if not success:
+def delete_post(post_id: int, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+    if not crud.delete_post(db, post_id):
         raise HTTPException(status_code=404, detail="Post not found")
     return {"message": "Post deleted successfully"}
 
 
-# NavLink APIs
-@app.post("/api/nav_links", response_model=schemas.NavLinkInDB)
-async def create_nav_link(nav_link: schemas.NavLinkCreate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+@app.post("/api/nav_links", response_model=schemas.NavLinkInDB, status_code=status.HTTP_201_CREATED)
+def create_nav_link(nav_link: schemas.NavLinkCreate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
     return crud.create_nav_link(db, nav_link)
 
+
 @app.put("/api/nav_links/{link_id}", response_model=schemas.NavLinkInDB)
-async def update_nav_link(link_id: int, link_update: schemas.NavLinkUpdate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+def update_nav_link(link_id: int, link_update: schemas.NavLinkUpdate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
     updated = crud.update_nav_link(db, link_id, link_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Navigation link not found")
     return updated
 
+
 @app.delete("/api/nav_links/{link_id}")
-async def delete_nav_link(link_id: int, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    success = crud.delete_nav_link(db, link_id)
-    if not success:
+def delete_nav_link(link_id: int, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+    if not crud.delete_nav_link(db, link_id):
         raise HTTPException(status_code=404, detail="Navigation link not found")
     return {"message": "Navigation link deleted successfully"}
 
 
-# Bookmark APIs
-@app.post("/api/bookmarks", response_model=schemas.BookmarkInDB)
-async def create_bookmark(bookmark: schemas.BookmarkCreate, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
+@app.post("/api/bookmarks", response_model=schemas.BookmarkInDB, status_code=status.HTTP_201_CREATED)
+def create_bookmark(bookmark: schemas.BookmarkCreate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
     return crud.create_bookmark(db, bookmark)
 
+
+@app.put("/api/bookmarks/{bookmark_id}", response_model=schemas.BookmarkInDB)
+def update_bookmark(bookmark_id: int, bookmark_update: schemas.BookmarkUpdate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+    updated = crud.update_bookmark(db, bookmark_id, bookmark_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+    return updated
+
+
 @app.delete("/api/bookmarks/{bookmark_id}")
-async def delete_bookmark(bookmark_id: int, db: Session = Depends(get_db), current_user: str = Depends(auth.get_current_user)):
-    success = crud.delete_bookmark(db, bookmark_id)
-    if not success:
+def delete_bookmark(bookmark_id: int, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+    if not crud.delete_bookmark(db, bookmark_id):
         raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"message": "Bookmark deleted successfully"}
 
 
-# Image Upload API
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), current_user: str = Depends(auth.get_current_user)):
-    # Validate extension
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]:
-        raise HTTPException(status_code=400, detail="Unsupported file format")
-        
-    # Generate unique filename
-    import uuid
-    filename = f"{uuid.uuid4()}{ext}"
-    file_path = UPLOAD_DIR / filename
-    
+class UploadRejected(Exception):
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+_UPLOAD_TYPES = {
+    ".jpg": {"mime": {"image/jpeg"}, "kind": "jpeg", "suffix": ".jpg"},
+    ".jpeg": {"mime": {"image/jpeg"}, "kind": "jpeg", "suffix": ".jpg"},
+    ".png": {"mime": {"image/png"}, "kind": "png", "suffix": ".png"},
+    ".gif": {"mime": {"image/gif"}, "kind": "gif", "suffix": ".gif"},
+    ".webp": {"mime": {"image/webp"}, "kind": "webp", "suffix": ".webp"},
+}
+
+
+def _matches_image_magic(data: bytes, kind: str) -> bool:
+    if kind == "jpeg":
+        return data.startswith(b"\xff\xd8\xff")
+    if kind == "png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if kind == "gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if kind == "webp":
+        return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return False
+
+
+def _save_upload(source, destination: Path, expected_kind: str) -> int:
+    temporary_path: Optional[Path] = None
+    total_bytes = 0
+    first_chunk = True
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-        
-    return {"url": f"/static/uploads/{filename}"}
+        source.seek(0)
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=UPLOAD_DIR,
+            prefix=".upload-",
+            suffix=".part",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            while True:
+                chunk = source.read(UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                if first_chunk:
+                    first_chunk = False
+                    if not _matches_image_magic(chunk, expected_kind):
+                        raise UploadRejected(400, "File content does not match the declared image format")
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise UploadRejected(413, f"File exceeds the {MAX_UPLOAD_BYTES}-byte upload limit")
+                temporary_file.write(chunk)
+
+        if first_chunk:
+            raise UploadRejected(400, "Empty files are not allowed")
+        os.replace(temporary_path, destination)
+        temporary_path = None
+        return total_bytes
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
+@app.post("/api/upload", status_code=status.HTTP_201_CREATED)
+async def upload_file(file: UploadFile = File(...), _current_user: str = Depends(auth.get_current_user)):
+    original_name = file.filename or ""
+    extension = Path(original_name).suffix.lower()
+    upload_type = _UPLOAD_TYPES.get(extension)
+    if not upload_type:
+        raise HTTPException(status_code=400, detail="Unsupported file format")
+    if (file.content_type or "").lower() not in upload_type["mime"]:
+        raise HTTPException(status_code=400, detail="MIME type does not match the file extension")
 
+    filename = f"{uuid.uuid4().hex}{upload_type['suffix']}"
+    destination = UPLOAD_DIR / filename
+    try:
+        size = await run_in_threadpool(
+            _save_upload,
+            file.file,
+            destination,
+            upload_type["kind"],
+        )
+    except UploadRejected as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except OSError:
+        logger.exception("Failed to persist uploaded image")
+        raise HTTPException(status_code=500, detail="Failed to save file")
+    finally:
+        await file.close()
 
+    return {"url": f"{UPLOAD_PUBLIC_PREFIX}/{filename}", "size": size}

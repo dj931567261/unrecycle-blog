@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# 测试与静态检查依赖
+pytest==8.4.1
+httpx==0.28.1
+pytest-timeout==2.4.0
+ruff==0.12.2

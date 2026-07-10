@@ -81,14 +81,22 @@
         charCount.textContent = `${textInput.value.length} 字符`;
     });
 
-    // Unicode-safe Base64 encoding
+    // 使用现代字节 API 处理 UTF-8，避免已废弃的 escape/unescape。
     function utf8_to_b64(str) {
-        return window.btoa(unescape(encodeURIComponent(str)));
+        const bytes = new TextEncoder().encode(str);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return window.btoa(binary);
     }
 
-    // Unicode-safe Base64 decoding
+    // 严格按 UTF-8 解码，非法字节会进入错误提示。
     function b64_to_utf8(str) {
-        return decodeURIComponent(escape(window.atob(str)));
+        const binary = window.atob(str.replace(/\s+/g, ''));
+        const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     }
 
     // Encode logic
@@ -165,6 +173,9 @@
                 copyBtn.style.borderColor = '';
                 copyBtn.style.color = '';
             }, 1500);
+        }).catch(() => {
+            errorBanner.textContent = '❌ 复制失败，请检查浏览器剪贴板权限。';
+            errorBanner.style.display = 'block';
         });
     });
 </script>

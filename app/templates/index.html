@@ -24,7 +24,7 @@
             <h1>你好，我是开发者 👋</h1>
             <p>全栈软件工程师 / 技术探索者。欢迎来到我的数字主页。这里记录了我的日常思考、常用工具以及好站收藏。</p>
             <div class="social-links">
-                <a href="https://github.com/dj931567261" target="_blank" class="btn-icon" title="GitHub"><i class="fa-brands fa-github"></i></a>
+                <a href="https://github.com/dj931567261" target="_blank" rel="noopener noreferrer" class="btn-icon" title="GitHub"><i class="fa-brands fa-github"></i></a>
                 <a href="mailto:dj931567261@gmail.com" class="btn-icon" title="Email"><i class="fa-solid fa-envelope"></i></a>
                 <a href="/tools" class="btn-icon" title="开发者小工具箱"><i class="fa-solid fa-toolbox"></i></a>
             </div>
@@ -50,7 +50,7 @@
                     <h3 class="category-name">{{ category }}</h3>
                     <div class="nav-links-grid">
                         {% for link in links %}
-                            <a href="{{ link.url }}" target="_blank" class="nav-card">
+                            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="nav-card">
                                 <div class="nav-card-icon">
                                     {% if link.icon %}
                                         {{ link.icon }}
@@ -133,7 +133,7 @@
                         <div class="glass-card bookmark-card">
                             <div class="bookmark-header">
                                 <span class="tag-badge" style="background: rgba(236, 72, 153, 0.1); color: var(--accent-pink); font-weight: 600;">书签</span>
-                                <a href="{{ bookmark.url }}" target="_blank" class="bookmark-link-btn">
+                                <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" class="bookmark-link-btn">
                                     打开网站 <i class="fa-solid fa-external-link" style="font-size: 11px;"></i>
                                 </a>
                             </div>

@@ -29,7 +29,7 @@
                 
                 <div id="login-error" class="error-banner" style="margin-bottom: 16px; margin-top: 0;"></div>
                 
-                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px 20px; font-size: 15px;">
+                <button id="login-submit-btn" type="submit" class="btn btn-primary" style="width: 100%; padding: 12px 20px; font-size: 15px;">
                     <i class="fa-solid fa-right-to-bracket"></i> 验证并登录
                 </button>
             </form>
@@ -43,10 +43,21 @@
 <script>
     const loginForm = document.getElementById('login-form');
     const loginError = document.getElementById('login-error');
+    const loginSubmitBtn = document.getElementById('login-submit-btn');
+
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('expired') === '1') {
+        loginError.textContent = '登录状态已过期，请重新登录后继续操作。';
+        loginError.style.display = 'block';
+    }
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (loginSubmitBtn.disabled) return;
         loginError.style.display = 'none';
+        const originalButtonHtml = loginSubmitBtn.innerHTML;
+        loginSubmitBtn.disabled = true;
+        loginSubmitBtn.textContent = '正在验证...';
         
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
@@ -73,6 +84,9 @@
         } catch (err) {
             loginError.textContent = '❌ 网络请求失败，请稍后重试。';
             loginError.style.display = 'block';
+        } finally {
+            loginSubmitBtn.disabled = false;
+            loginSubmitBtn.innerHTML = originalButtonHtml;
         }
     });
 </script>

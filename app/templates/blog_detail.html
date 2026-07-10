@@ -69,7 +69,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
         }
@@ -162,7 +162,9 @@
         .toc-link {
             color: var(--text-secondary);
             text-decoration: none;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        border-left-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        padding-left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             display: block;
             border-left: 2px solid transparent;
             padding-left: 8px;
@@ -292,19 +294,30 @@
             
             wrapper.appendChild(button);
             
-            button.addEventListener('click', () => {
+            button.addEventListener('click', async () => {
                 const code = block.querySelector('code');
                 let codeText = code ? code.innerText : block.innerText;
-                
-                navigator.clipboard.writeText(codeText).then(() => {
+                try {
+                    await navigator.clipboard.writeText(codeText);
                     button.innerHTML = '<i class="fa-solid fa-check" style="color: var(--success);"></i>';
                     button.style.borderColor = 'var(--success)';
+                    button.title = '复制成功';
                     
                     setTimeout(() => {
                         button.innerHTML = '<i class="fa-regular fa-copy"></i>';
                         button.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        button.title = '复制代码';
                     }, 2000);
-                });
+                } catch (error) {
+                    button.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color: var(--error);"></i>';
+                    button.style.borderColor = 'var(--error)';
+                    button.title = '复制失败，请手动选择代码复制';
+                    setTimeout(() => {
+                        button.innerHTML = '<i class="fa-regular fa-copy"></i>';
+                        button.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        button.title = '复制代码';
+                    }, 2500);
+                }
             });
         });
     });
@@ -451,19 +464,23 @@
     // Make external links open in a new tab
     window.addEventListener('DOMContentLoaded', () => {
         const links = document.querySelectorAll('.markdown-body a');
-        const currentDomain = window.location.hostname;
         links.forEach(link => {
-            const href = link.getAttribute('href');
-            if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-                try {
-                    const linkUrl = new URL(href);
-                    if (linkUrl.hostname !== currentDomain) {
-                        link.setAttribute('target', '_blank');
-                        link.setAttribute('rel', 'noopener noreferrer');
-                    }
-                } catch (e) {
-                    // Fallback
+            const href = (link.getAttribute('href') || '').trim();
+            if (!href) return;
+            try {
+                const linkUrl = new URL(href, window.location.origin);
+                if (!['http:', 'https:', 'mailto:', 'tel:'].includes(linkUrl.protocol)) {
+                    link.removeAttribute('href');
+                    link.setAttribute('title', '已阻止不安全链接');
+                    return;
                 }
+                if (['http:', 'https:'].includes(linkUrl.protocol) && linkUrl.origin !== window.location.origin) {
+                    link.setAttribute('target', '_blank');
+                    link.setAttribute('rel', 'noopener noreferrer');
+                }
+            } catch (error) {
+                link.removeAttribute('href');
+                link.setAttribute('title', '无效链接');
             }
         });
     });
