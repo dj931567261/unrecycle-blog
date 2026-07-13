@@ -9,7 +9,7 @@
     <meta name="description" content="{% block description %}这是我个人的技术博客、常用网址导航与网站收藏夹，用于记录我的技术成长与灵感碎片。{% endblock %}">
     
     <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="/static/css/style.css?v=1.13">
+    <link rel="stylesheet" href="/static/css/style.css?v=1.14">
     
     <!-- Prism.js Syntax Highlighting Theme (Tomorrow Night / Dark) -->
     <link rel="stylesheet" href="/static/css/prism-tomorrow.min.css">
@@ -433,17 +433,41 @@
         });
 
         // Reveal content only when motion is allowed. Content stays visible without JS.
-        const revealElements = document.querySelectorAll('[data-reveal]');
+        const revealElements = Array.from(document.querySelectorAll('[data-reveal]'));
         if (document.documentElement.classList.contains('motion-ready') && revealElements.length) {
+            const pendingRevealElements = new Set(revealElements);
+            const revealElement = element => {
+                if (!pendingRevealElements.has(element)) return;
+                element.classList.add('is-visible');
+                pendingRevealElements.delete(element);
+                revealObserver.unobserve(element);
+                if (!pendingRevealElements.size) {
+                    window.clearTimeout(window.__motionReadyFailsafe);
+                }
+            };
             const revealObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
                     if (!entry.isIntersecting) return;
-                    entry.target.classList.add('is-visible');
-                    revealObserver.unobserve(entry.target);
+                    revealElement(entry.target);
                 });
-            }, { threshold: 0.12, rootMargin: '0px 0px -32px' });
-            revealElements.forEach(element => revealObserver.observe(element));
+            }, { threshold: 0, rootMargin: '0px 0px -32px' });
+
             window.clearTimeout(window.__motionReadyFailsafe);
+            revealElements.forEach(element => {
+                const elementHeight = element.getBoundingClientRect().height;
+                if (elementHeight > Math.max(window.innerHeight * 1.25, 1200)) {
+                    revealElement(element);
+                } else {
+                    revealObserver.observe(element);
+                }
+            });
+
+            // 动画只是增强效果：即使观察器或浏览器扩展异常，也不能长期隐藏内容。
+            window.__motionReadyFailsafe = window.setTimeout(() => {
+                pendingRevealElements.forEach(element => element.classList.add('is-visible'));
+                pendingRevealElements.clear();
+                revealObserver.disconnect();
+            }, 2500);
         } else {
             revealElements.forEach(element => element.classList.add('is-visible'));
             window.clearTimeout(window.__motionReadyFailsafe);

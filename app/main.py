@@ -200,11 +200,12 @@ def _apply_security_headers(response, request: Request) -> None:
         "object-src 'none'; "
         "frame-ancestors 'none'; "
         "form-action 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.bootcdn.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.bootcdn.net "
+        "https://static.cloudflareinsights.com; "
         "style-src 'self' 'unsafe-inline'; "
         "font-src 'self' data:; "
         "img-src 'self' data: blob: https:; "
-        "connect-src 'self'",
+        "connect-src 'self' https://cloudflareinsights.com",
     )
     if COOKIE_SECURE:
         response.headers.setdefault(

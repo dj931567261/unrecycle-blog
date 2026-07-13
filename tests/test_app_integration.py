@@ -64,6 +64,37 @@ def test_healthz_uses_temporary_database(app_bundle):
     assert app_bundle.database_path.parent == app_bundle.upload_dir.parent
 
 
+def test_security_policy_allows_cloudflare_web_analytics(app_bundle):
+    response = app_bundle.client.get("/")
+    content_security_policy = response.headers["content-security-policy"]
+
+    assert "https://static.cloudflareinsights.com" in content_security_policy
+    assert "connect-src 'self' https://cloudflareinsights.com" in content_security_policy
+
+
+def test_article_content_is_not_hidden_by_reveal_animation(app_bundle):
+    with app_bundle.database.SessionLocal() as db:
+        db.add(
+            app_bundle.models.Post(
+                title="长文章显示测试",
+                slug="long-article-visibility",
+                content=("## 章节\n\nlong-article-visible-marker\n\n" * 400),
+                summary="验证长文章正文不会被滚动动画永久隐藏",
+                category="测试",
+                tags="visibility",
+                is_published=True,
+            )
+        )
+        db.commit()
+
+    response = app_bundle.client.get("/blog/long-article-visibility")
+
+    assert response.status_code == 200
+    assert "long-article-visible-marker" in response.text
+    assert '<div class="blog-main-content">' in response.text
+    assert 'class="blog-main-content" data-reveal' not in response.text
+
+
 def test_browser_404_uses_custom_page_while_api_keeps_json(app_bundle):
     page_response = app_bundle.client.get(
         "/missing-page",
