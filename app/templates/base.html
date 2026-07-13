@@ -9,7 +9,7 @@
     <meta name="description" content="{% block description %}这是我个人的技术博客、常用网址导航与网站收藏夹，用于记录我的技术成长与灵感碎片。{% endblock %}">
     
     <!-- Custom Style Sheet -->
-    <link rel="stylesheet" href="/static/css/style.css?v=1.8">
+    <link rel="stylesheet" href="/static/css/style.css?v=1.13">
     
     <!-- Prism.js Syntax Highlighting Theme (Tomorrow Night / Dark) -->
     <link rel="stylesheet" href="/static/css/prism-tomorrow.min.css">
@@ -28,26 +28,36 @@
                 savedTheme = 'dark';
             }
             document.documentElement.setAttribute('data-theme', savedTheme);
+            if (
+                'IntersectionObserver' in window &&
+                !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ) {
+                document.documentElement.classList.add('motion-ready');
+                window.__motionReadyFailsafe = window.setTimeout(() => {
+                    document.documentElement.classList.remove('motion-ready');
+                }, 2000);
+            }
         })();
     </script>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
     <!-- Header Navigation -->
     <header class="site-header">
         <div class="container nav-container">
             <!-- Site Brand Logo -->
-            <a href="/" class="site-logo">
-                <i class="fa-solid fa-terminal"></i> Unrecycle.me
+            <a href="/" class="site-logo" aria-label="Unrecycle.me 首页">
+                <span class="site-logo-mark" aria-hidden="true">U/</span>
+                <span class="site-logo-word">Unrecycle<span>.me</span></span>
             </a>
             
             <!-- Main Site Nav links -->
             <nav id="site-nav" class="site-nav" aria-label="主导航">
                 <ul>
-                    <li><a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">首页</a></li>
-                    <li><a href="/blog" class="nav-link {% if request.url.path.startswith('/blog') %}active{% endif %}">博客</a></li>
-                    <li><a href="/bookmarks" class="nav-link {% if request.url.path.startswith('/bookmarks') %}active{% endif %}">收藏</a></li>
-                    <li><a href="/tools" class="nav-link {% if request.url.path.startswith('/tools') %}active{% endif %}">工具箱</a></li>
+                    <li><a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}" {% if request.url.path == '/' %}aria-current="page"{% endif %}>首页</a></li>
+                    <li><a href="/blog" class="nav-link {% if request.url.path.startswith('/blog') %}active{% endif %}" {% if request.url.path.startswith('/blog') %}aria-current="page"{% endif %}>博客</a></li>
+                    <li><a href="/bookmarks" class="nav-link {% if request.url.path.startswith('/bookmarks') %}active{% endif %}" {% if request.url.path.startswith('/bookmarks') %}aria-current="page"{% endif %}>收藏</a></li>
+                    <li><a href="/tools" class="nav-link {% if request.url.path.startswith('/tools') %}active{% endif %}" {% if request.url.path.startswith('/tools') %}aria-current="page"{% endif %}>工具箱</a></li>
                 </ul>
             </nav>
             
@@ -57,12 +67,16 @@
                         aria-label="打开导航菜单" aria-controls="site-nav" aria-expanded="false">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <button id="theme-toggle-btn" class="btn-icon" title="切换主题 (明亮 / 暗黑)">
+                <button id="theme-toggle-btn" class="btn-icon" type="button" title="切换主题 (明亮 / 暗黑)" aria-label="切换明亮或暗黑主题">
                     <i class="fa-solid fa-sun" id="theme-icon-sun" style="display:none;"></i>
                     <i class="fa-solid fa-moon" id="theme-icon-moon" style="display:none;"></i>
                 </button>
-                <button id="search-trigger-btn" class="btn-icon" title="搜索 (Cmd + K / Ctrl + K)">
-                    <i class="fa-solid fa-magnifying-glass"></i>
+                <button id="search-trigger-btn" class="btn-icon nav-search-trigger" type="button"
+                        data-search-trigger aria-haspopup="dialog" aria-label="打开全局搜索"
+                        title="搜索 (Cmd + K / Ctrl + K)">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <span class="nav-search-label">搜索</span>
+                    <kbd>⌘K</kbd>
                 </button>
                 
                 {% if is_admin or username %}
@@ -78,7 +92,7 @@
     </header>
 
     <!-- Main Content Area -->
-    <main style="flex-grow: 1; padding: 24px 0;">
+    <main class="site-main">
         <div class="container">
             {% block content %}{% endblock %}
         </div>
@@ -86,20 +100,30 @@
 
     <!-- Footer -->
     <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2026 Unrecycle-Me. Built with FastAPI &amp; SQLite. Designed with Glassmorphism.</p>
+        <div class="container site-footer-inner">
+            <div>
+                <strong>Unrecycle.me</strong>
+                <p>记录技术、工具与持续生长的灵感。</p>
+            </div>
+            <p class="site-footer-meta">&copy; 2026 · FastAPI / SQLite / Vanilla Web</p>
         </div>
     </footer>
 
     <!-- Global search dialog (Cmd + K) -->
-    <div id="search-modal" class="modal-backdrop">
-        <div class="glass-card admin-modal" style="max-width: 600px; padding: 24px;">
-            <div class="modal-header" style="margin-bottom: 16px; border: none; padding-bottom: 0;">
-                <h3 style="font-size: 18px;"><i class="fa-solid fa-magnifying-glass" style="margin-right: 8px; color: var(--accent-blue);"></i> 全局检索</h3>
-                <button id="search-modal-close" class="modal-close">&times;</button>
+    <div id="search-modal" class="modal-backdrop search-modal" role="dialog" aria-modal="true"
+         aria-labelledby="search-dialog-title" aria-hidden="true" inert>
+        <div class="search-dialog">
+            <div class="modal-header search-dialog-header">
+                <div>
+                    <span class="search-dialog-kicker">COMMAND PALETTE</span>
+                    <h2 id="search-dialog-title">搜索这个数字空间</h2>
+                </div>
+                <button id="search-modal-close" class="modal-close" type="button" aria-label="关闭搜索弹窗">&times;</button>
             </div>
-            <div style="position: relative; margin-bottom: 16px;">
-                <input type="text" id="global-search-input" class="form-control" placeholder="输入关键字搜索博客、导航或收藏..." style="padding-left: 40px; font-size: 15px;">
+            <div class="search-dialog-input-wrap">
+                <input type="search" id="global-search-input" class="form-control"
+                       maxlength="100" autocomplete="off"
+                       placeholder="搜索博客、导航或收藏..." aria-label="输入搜索关键词">
                 <i class="fa-solid fa-keyboard" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
                 <i class="fa-solid fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
             </div>
@@ -144,6 +168,8 @@
         const siteNav = document.getElementById('site-nav');
         let searchTimer = null;
         let searchController = null;
+        let searchReturnFocus = null;
+        let searchFocusTimer = null;
 
         function setSearchStatus(message) {
             const status = document.createElement('div');
@@ -230,19 +256,42 @@
         }
 
         function openSearch() {
+            window.clearTimeout(searchFocusTimer);
+            searchReturnFocus = document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : searchTriggerBtn;
+            searchModal.removeAttribute('inert');
+            searchModal.setAttribute('aria-hidden', 'false');
             searchModal.classList.add('open');
-            setTimeout(() => globalSearchInput.focus(), 150);
+            document.body.classList.add('modal-open');
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            searchFocusTimer = window.setTimeout(() => {
+                if (searchModal.classList.contains('open') && !searchModal.hasAttribute('inert')) {
+                    globalSearchInput.focus();
+                }
+            }, reduceMotion ? 0 : 120);
         }
 
         function closeSearch() {
+            window.clearTimeout(searchFocusTimer);
             searchModal.classList.remove('open');
+            document.body.classList.remove('modal-open');
             globalSearchInput.value = '';
             if (searchController) searchController.abort();
             window.clearTimeout(searchTimer);
             setSearchStatus('输入任意内容开始检索...');
+            if (searchReturnFocus && document.contains(searchReturnFocus)) {
+                searchReturnFocus.focus();
+            } else if (searchModal.contains(document.activeElement)) {
+                document.activeElement.blur();
+            }
+            searchModal.setAttribute('aria-hidden', 'true');
+            searchModal.setAttribute('inert', '');
         }
 
-        if (searchTriggerBtn) searchTriggerBtn.addEventListener('click', openSearch);
+        document.querySelectorAll('[data-search-trigger]').forEach(trigger => {
+            trigger.addEventListener('click', openSearch);
+        });
         if (searchModalClose) searchModalClose.addEventListener('click', closeSearch);
 
         // Close on clicking backdrop
@@ -293,6 +342,21 @@
                 closeSearch();
             }
             if (e.key === 'Escape') closeMobileNav();
+            if (e.key === 'Tab' && searchModal.classList.contains('open')) {
+                const focusable = Array.from(searchModal.querySelectorAll(
+                    'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+                )).filter(element => !element.hasAttribute('inert'));
+                if (!focusable.length) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
         });
 
         // Search the complete server-side index so the dialog behaves consistently on every page.
@@ -348,15 +412,56 @@
             themeToggleBtn.addEventListener('click', () => {
                 const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
                 const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                try {
-                    localStorage.setItem('theme', newTheme);
-                } catch (error) {
-                    console.warn('无法保存主题偏好:', error);
+                const applyTheme = () => {
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    try {
+                        localStorage.setItem('theme', newTheme);
+                    } catch (error) {
+                        console.warn('无法保存主题偏好:', error);
+                    }
+                    updateThemeUI(newTheme);
+                };
+                if (
+                    document.startViewTransition &&
+                    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ) {
+                    document.startViewTransition(applyTheme);
+                } else {
+                    applyTheme();
                 }
-                updateThemeUI(newTheme);
             });
         });
+
+        // Reveal content only when motion is allowed. Content stays visible without JS.
+        const revealElements = document.querySelectorAll('[data-reveal]');
+        if (document.documentElement.classList.contains('motion-ready') && revealElements.length) {
+            const revealObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    entry.target.classList.add('is-visible');
+                    revealObserver.unobserve(entry.target);
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -32px' });
+            revealElements.forEach(element => revealObserver.observe(element));
+            window.clearTimeout(window.__motionReadyFailsafe);
+        } else {
+            revealElements.forEach(element => element.classList.add('is-visible'));
+            window.clearTimeout(window.__motionReadyFailsafe);
+        }
+
+        // Header gains a compact solid state after the page starts scrolling.
+        let headerScrollTicking = false;
+        const siteHeader = document.querySelector('.site-header');
+        function updateHeaderState() {
+            if (siteHeader) siteHeader.classList.toggle('is-scrolled', window.scrollY > 12);
+            headerScrollTicking = false;
+        }
+        window.addEventListener('scroll', () => {
+            if (headerScrollTicking) return;
+            headerScrollTicking = true;
+            window.requestAnimationFrame(updateHeaderState);
+        }, { passive: true });
+        updateHeaderState();
     </script>
 
     {% block scripts %}{% endblock %}

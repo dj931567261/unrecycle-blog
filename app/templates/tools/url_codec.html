@@ -1,35 +1,49 @@
 {% extends "base.html" %}
 
 {% block title %}URL 编码与解码 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
-
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🌐 URL 编码与解码</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">在本地对 URL 网址参数进行标准的转义编码与还原解码，完美支持中文字符。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / WEB CODEC</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon" aria-hidden="true"><i class="fa-solid fa-link"></i></span>
+                    URL 编码与解码
+                </h1>
+                <p class="tool-detail-description">在浏览器本地对 URL 和查询参数进行标准转义与还原，正确处理中文字符。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> 本地处理</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-bolt" aria-hidden="true"></i> 即时转换</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Workspace -->
-    <div class="tool-page-layout">
+    <div class="tool-page-layout tool-workbench">
         
         <!-- Controls Toolbar -->
-        <div class="tool-header-row">
-            <div class="toolbar-controls">
-                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+        <div class="tool-header-row tool-action-bar" data-reveal data-reveal-delay="1">
+            <div class="toolbar-controls tool-action-group">
+                <button type="button" id="encode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-code"></i> URL 编码
                 </button>
-                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                <button type="button" id="decode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-code-compare"></i> URL 解码
                 </button>
             </div>
-            <div class="toolbar-controls">
-                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+            <div class="toolbar-controls tool-action-group tool-action-group-secondary">
+                <button type="button" id="clear-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-trash-can"></i> 清空
                 </button>
-                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                <button type="button" id="copy-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-copy"></i> 复制结果
                 </button>
             </div>
@@ -39,19 +53,19 @@
         <div class="tool-workspace">
             
             <!-- Left panel: Raw Input -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="2">
                 <div class="panel-title-bar">
-                    <span>原始文本 / URL</span>
-                    <span id="char-count">0 字符</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> 原始文本 / URL</span>
+                    <span id="char-count" class="tool-panel-status">0 字符</span>
                 </div>
                 <textarea id="text-input" class="tool-textarea" placeholder="在此输入需要进行 URL 编码/解码的文本或网址参数..." autocomplete="off" spellcheck="false"></textarea>
             </div>
             
             <!-- Right panel: Highlighted Output -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="3">
                 <div class="panel-title-bar">
-                    <span>处理结果</span>
-                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-terminal" aria-hidden="true"></i> 处理结果</span>
+                    <span id="codec-status" class="tool-panel-status" aria-live="polite">就绪</span>
                 </div>
                 <textarea id="text-output" readonly class="tool-textarea" placeholder="处理后的结果将在此显示..."></textarea>
             </div>
@@ -61,6 +75,7 @@
         <!-- Validation Error Message Banner -->
         <div id="validation-error" class="error-banner"></div>
     </div>
+</section>
 
 {% endblock %}
 

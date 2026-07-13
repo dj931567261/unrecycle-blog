@@ -1,71 +1,126 @@
 {% extends "base.html" %}
 
 {% block title %}技术博客 | Unrecycle-Me{% endblock %}
+{% block description %}记录软件开发、系统架构、运维调试与个人学习过程中的技术文章和实践心得。{% endblock %}
+{% block body_class %}blog-body blog-index-body{% endblock %}
 
 {% block content %}
+<div class="blog-index-page">
+    <header class="blog-index-hero" aria-labelledby="blog-index-title">
+        <div class="blog-index-hero-copy" data-reveal>
+            <span class="blog-editorial-kicker">
+                <span class="status-dot" aria-hidden="true"></span>
+                Writing archive · Unrecycle.me
+            </span>
+            <h1 id="blog-index-title">把答案写下来，<br>让经验可以复用。</h1>
+            <p>
+                关于软件开发、系统架构、运维调试与持续学习的技术笔记。
+                既记录最终答案，也保留抵达答案之前的思考路径。
+            </p>
+        </div>
 
-    <div style="margin-bottom: 40px; margin-top: 20px;">
-        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">📖 我的技术博客</h1>
-        <p style="color: var(--text-secondary); max-width: 600px;">这里是我平时在软件开发、系统架构、运维调试以及个人学习中整理沉淀的技术文章和心得总结。</p>
-    </div>
+        <div class="blog-index-hero-meta" data-reveal data-reveal-delay="1" aria-label="文章归档信息">
+            <span>ARCHIVE STATUS</span>
+            <strong>
+                {% if pagination %}
+                    {{ pagination.total }} 篇文章
+                {% else %}
+                    {{ posts|length }} 篇文章
+                {% endif %}
+            </strong>
+            <small>持续写作 · 持续更新</small>
+        </div>
+    </header>
 
-    <!-- Blog Posts Feed List -->
-    <div style="max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+    <section class="blog-archive" aria-labelledby="blog-archive-title">
+        <header class="blog-archive-header" data-reveal>
+            <div>
+                <span class="blog-section-index">01 / ALL STORIES</span>
+                <h2 id="blog-archive-title">全部文章</h2>
+            </div>
+            <p>按发布时间从新到旧，浏览这座数字花园中的技术记录。</p>
+        </header>
+
         {% if posts %}
-            {% for post in posts %}
-                <article class="glass-card post-card">
-                    <div class="post-meta">
-                        <span class="post-category">{{ post.category }}</span>
-                        <span>&bull;</span>
-                        <span>{{ post.created_at | datetime("%Y年%m月%d日") }}</span>
-                        <span>&bull;</span>
-                        <span><i class="fa-solid fa-eye"></i> {{ post.views }} 次阅读</span>
-                        
-                        {% if not post.is_published %}
-                            <span style="background: rgba(245, 158, 11, 0.1); color: var(--warning); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600;">草稿</span>
-                        {% endif %}
-                    </div>
-                    <a href="/blog/{{ post.slug }}">
-                        <h2 class="post-card-title" style="font-size: 22px; margin-bottom: 12px;">{{ post.title }}</h2>
-                    </a>
-                    <p class="post-card-summary" style="margin-bottom: 20px; font-size: 15px; color: var(--text-secondary);">{{ post.summary or "点击阅读全文..." }}</p>
-                    <div class="post-card-footer">
-                        <div class="tags-list">
-                            {% if post.tags %}
-                                {% for tag in post.tags.split(',') %}
-                                    <span class="tag-badge">#{{ tag.strip() }}</span>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                        <a href="/blog/{{ post.slug }}" class="read-more">阅读全文 <i class="fa-solid fa-angle-right"></i></a>
-                    </div>
-                </article>
-            {% endfor %}
+            <div class="blog-post-list">
+                {% for post in posts %}
+                    <article class="blog-post-row{% if loop.first %} blog-post-row-featured{% endif %}"
+                             data-reveal data-reveal-delay="{{ (loop.index0 % 4) + 1 }}">
+                        <a href="/blog/{{ post.slug }}" class="blog-post-link">
+                            <span class="blog-post-number" aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
+
+                            <div class="blog-post-copy">
+                                <div class="blog-post-meta">
+                                    <span class="blog-post-category">{{ post.category }}</span>
+                                    <span aria-hidden="true">/</span>
+                                    <time>{{ post.created_at | datetime("%Y年%m月%d日") }}</time>
+                                    <span aria-hidden="true">/</span>
+                                    <span><i class="fa-regular fa-eye" aria-hidden="true"></i> {{ post.views }} 次阅读</span>
+                                    {% if not post.is_published %}
+                                        <span class="blog-draft-badge">草稿</span>
+                                    {% endif %}
+                                </div>
+
+                                <h3>{{ post.title }}</h3>
+                                <p>{{ post.summary or "点击阅读全文，了解这篇文章的完整内容。" }}</p>
+
+                                {% if post.tags %}
+                                    <div class="blog-post-tags" aria-label="文章标签">
+                                        {% for tag in post.tags.split(',') %}
+                                            <span>#{{ tag.strip() }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <span class="blog-post-arrow" aria-hidden="true">
+                                <i class="fa-solid fa-arrow-up-right"></i>
+                            </span>
+                        </a>
+                    </article>
+                {% endfor %}
+            </div>
         {% else %}
-            <div class="glass-card" style="text-align: center; padding: 60px; color: var(--text-secondary);">
-                <i class="fa-solid fa-book-open" style="font-size: 40px; margin-bottom: 16px; color: var(--text-muted);"></i>
-                <p>暂无博客文章发布，敬请期待。</p>
+            <div class="editorial-empty blog-empty-state" data-reveal>
+                <span>NO STORIES YET</span>
+                <h3>新的文章正在准备中</h3>
+                <p>这里暂时还没有已发布的博客文章，稍后再来看看吧。</p>
                 {% if is_admin %}
-                    <a href="/admin" class="btn btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-plus"></i> 去写一篇</a>
+                    <a href="/admin" class="btn btn-primary">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i> 去写一篇
+                    </a>
                 {% endif %}
             </div>
         {% endif %}
-    </div>
+    </section>
 
     {% if pagination and pagination.total_pages > 1 %}
-        <nav class="pagination-controls" aria-label="博客分页">
-            {% if pagination.page > 1 %}
-                <a class="btn btn-secondary" href="/blog?page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}">
-                    <i class="fa-solid fa-angle-left"></i> 上一页
-                </a>
-            {% endif %}
-            <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 页，共 {{ pagination.total }} 篇</span>
-            {% if pagination.page < pagination.total_pages %}
-                <a class="btn btn-secondary" href="/blog?page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}">
-                    下一页 <i class="fa-solid fa-angle-right"></i>
-                </a>
-            {% endif %}
+        <nav class="pagination-controls blog-pagination" aria-label="博客分页" data-reveal>
+            <div class="blog-pagination-action">
+                {% if pagination.page > 1 %}
+                    <a class="btn btn-secondary blog-pagination-link"
+                       href="/blog?page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}"
+                       aria-label="前往上一页">
+                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> 上一页
+                    </a>
+                {% endif %}
+            </div>
+
+            <span class="blog-pagination-status">
+                <strong>第 {{ pagination.page }} / {{ pagination.total_pages }} 页</strong>
+                <small>共 {{ pagination.total }} 篇</small>
+            </span>
+
+            <div class="blog-pagination-action blog-pagination-action-next">
+                {% if pagination.page < pagination.total_pages %}
+                    <a class="btn btn-secondary blog-pagination-link"
+                       href="/blog?page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}"
+                       aria-label="前往下一页">
+                        下一页 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                    </a>
+                {% endif %}
+            </div>
         </nav>
     {% endif %}
-
+</div>
 {% endblock %}

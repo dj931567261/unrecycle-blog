@@ -1,73 +1,223 @@
 {% extends "base.html" %}
 
 {% block title %}开发者工具箱 | Unrecycle-Me{% endblock %}
+{% block description %}无需上传数据、直接在浏览器本地运行的开发者实用工具，包括 JSON、时间戳、Base64、URL、Unicode 与图片处理。{% endblock %}
+{% block body_class %}toolbox-body{% endblock %}
 
 {% block content %}
+<div class="toolbox-page">
+    <section class="toolbox-hero" aria-labelledby="toolbox-title">
+        <div class="toolbox-hero-copy" data-reveal>
+            <span class="toolbox-kicker">
+                <span class="status-dot" aria-hidden="true"></span>
+                04 / LOCAL UTILITIES
+            </span>
+            <h1 id="toolbox-title">把重复的小事，<br>交给浏览器。</h1>
+            <p>
+                一组轻量、即开即用的本地工具，用来处理开发中频繁遇到的格式转换与数据整理。
+                核心计算在你的浏览器内完成，敏感内容无需离开当前设备。
+            </p>
+            <ul class="toolbox-trust-list" aria-label="工具箱特性">
+                <li><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> 浏览器本地执行</li>
+                <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> 无需上传数据</li>
+                <li><i class="fa-solid fa-bolt" aria-hidden="true"></i> 打开即可使用</li>
+            </ul>
+        </div>
 
-    <div style="margin-bottom: 40px; margin-top: 20px;">
-        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">🛠️ 实用小工具箱</h1>
-        <p style="color: var(--text-secondary); max-width: 600px;">这些小工具完全在你的本地浏览器运行，处理过程不经过任何后端服务器，保证你敏感数据（如代码、凭证等）的绝对安全。</p>
-    </div>
+        <aside class="toolbox-manifest" data-reveal data-reveal-delay="1" aria-label="工具箱运行信息">
+            <div class="toolbox-manifest-head">
+                <span>UTILITY / MANIFEST</span>
+                <span class="toolbox-manifest-state"><i aria-hidden="true"></i> READY</span>
+            </div>
+            <div class="toolbox-manifest-mark" aria-hidden="true">
+                <span>&lt;</span><span>/</span><span>&gt;</span>
+            </div>
+            <dl class="toolbox-manifest-list">
+                <div>
+                    <dt>TOOLS</dt>
+                    <dd>07 utilities</dd>
+                </div>
+                <div>
+                    <dt>UPLOAD</dt>
+                    <dd>Not required</dd>
+                </div>
+                <div>
+                    <dt>RUNTIME</dt>
+                    <dd>Your browser</dd>
+                </div>
+            </dl>
+        </aside>
+    </section>
 
-    <!-- Tools grid -->
-    <div class="tools-grid">
-        
-        <!-- JSON Formatter -->
-        <a href="/tools/json-formatter" class="glass-card tool-card">
-            <div class="tool-card-icon">📁</div>
-            <h3 class="tool-card-title">JSON 格式化与校验</h3>
-            <p class="tool-card-desc">对 JSON 字符串进行本地解析、验证语法错误，并缩进美化或单行压缩，支持实时行号定位。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
-        
-        <!-- Timestamp Converter -->
-        <a href="/tools/timestamp-converter" class="glass-card tool-card">
-            <div class="tool-card-icon">⏱️</div>
-            <h3 class="tool-card-title">Unix 时间戳转换</h3>
-            <p class="tool-card-desc">在 Unix 时间戳（秒/毫秒）与北京时间/UTC时间之间进行双向快速转换，支持实时时间时钟。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
-        
-        <!-- Base64 Codec -->
-        <a href="/tools/base64" class="glass-card tool-card">
-            <div class="tool-card-icon">🔐</div>
-            <h3 class="tool-card-title">Base64 编码与解码</h3>
-            <p class="tool-card-desc">快速将普通文本转换为 Base64 编码，或者将 Base64 数据还原为文本，支持 utf-8 字符集。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
-        
-        <!-- URL Codec -->
-        <a href="/tools/url-codec" class="glass-card tool-card">
-            <div class="tool-card-icon">🌐</div>
-            <h3 class="tool-card-title">URL 编码与解码</h3>
-            <p class="tool-card-desc">对网址参数进行标准的 URL 编码与解码，支持汉字及特殊符号的转义处理。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
+    <section class="toolbox-catalog" aria-labelledby="toolbox-catalog-title">
+        <header class="toolbox-section-head" data-reveal>
+            <div>
+                <span class="toolbox-section-index">UTILITY SHELF / 07</span>
+                <h2 id="toolbox-catalog-title">选择一个工具开始</h2>
+            </div>
+            <p>所有处理均默认留在当前浏览器会话中。</p>
+        </header>
 
-        <!-- Hexagram Codec -->
-        <a href="/tools/hexagram-codec" class="glass-card tool-card">
-            <div class="tool-card-icon">☯️</div>
-            <h3 class="tool-card-title">卦象密码翻译器</h3>
-            <p class="tool-card-desc">将普通文本隐写为周易六十四卦象符号，或将卦象密文还原为原文，支持智能自动转换。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
+        <div class="toolbox-grid tools-grid">
+            <a href="/tools/json-formatter" class="toolbox-card tool-card toolbox-card-featured"
+               data-tool="json" data-reveal data-reveal-delay="1">
+                <span class="toolbox-card-topline">
+                    <span>01 / DATA</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-code"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">FORMAT &amp; VALIDATE</span>
+                    <span class="toolbox-card-title tool-card-title">JSON 格式化与校验</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        本地解析 JSON、定位语法错误，并在缩进美化与单行压缩之间快速切换。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
 
-        <!-- Unicode Codec -->
-        <a href="/tools/unicode-codec" class="glass-card tool-card">
-            <div class="tool-card-icon">🔤</div>
-            <h3 class="tool-card-title">Unicode 编解码</h3>
-            <p class="tool-card-desc">在本地快速实现普通文本与 Unicode 编码（如 \uXXXX、HTML 实体、Unicode 码点等）之间的双向转换。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
-        
-        <!-- Background Cutout -->
-        <a href="/tools/background-cutout" class="glass-card tool-card">
-            <div class="tool-card-icon">🎨</div>
-            <h3 class="tool-card-title">智能吸色抠图</h3>
-            <p class="tool-card-desc">纯本地客户端处理，通过吸取图片颜色并调整容差，一键去除背景，支持导出 PNG 透明图或 WebP/JPEG 格式。</p>
-            <span class="read-more" style="margin-top: auto;">打开工具 <i class="fa-solid fa-arrow-right"></i></span>
-        </a>
-        
-    </div>
+            <a href="/tools/timestamp-converter" class="toolbox-card tool-card"
+               data-tool="timestamp" data-reveal data-reveal-delay="2">
+                <span class="toolbox-card-topline">
+                    <span>02 / TIME</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-regular fa-clock"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">TIME CONVERTER</span>
+                    <span class="toolbox-card-title tool-card-title">Unix 时间戳转换</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        在秒、毫秒时间戳与北京时间、UTC 时间之间双向转换，并提供实时时钟。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
 
+            <a href="/tools/base64" class="toolbox-card tool-card"
+               data-tool="base64" data-reveal data-reveal-delay="3">
+                <span class="toolbox-card-topline">
+                    <span>03 / TEXT</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">ENCODE &amp; DECODE</span>
+                    <span class="toolbox-card-title tool-card-title">Base64 编码与解码</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        快速完成普通文本与 Base64 数据的双向转换，完整支持 UTF-8 字符集。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
+
+            <a href="/tools/url-codec" class="toolbox-card tool-card"
+               data-tool="url" data-reveal data-reveal-delay="4">
+                <span class="toolbox-card-topline">
+                    <span>04 / WEB</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-link"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">URL TRANSFORM</span>
+                    <span class="toolbox-card-title tool-card-title">URL 编码与解码</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        对网址与查询参数进行标准编码或还原，正确处理汉字及特殊符号。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
+
+            <a href="/tools/hexagram-codec" class="toolbox-card tool-card"
+               data-tool="hexagram" data-reveal data-reveal-delay="1">
+                <span class="toolbox-card-topline">
+                    <span>05 / CIPHER</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon toolbox-card-glyph" aria-hidden="true">䷀</span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">HEXAGRAM CIPHER</span>
+                    <span class="toolbox-card-title tool-card-title">卦象密码翻译器</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        将普通文本隐写为六十四卦象符号，或智能识别卦象密文并还原原文。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
+
+            <a href="/tools/unicode-codec" class="toolbox-card tool-card"
+               data-tool="unicode" data-reveal data-reveal-delay="2">
+                <span class="toolbox-card-topline">
+                    <span>06 / TEXT</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-font"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">CHARACTER CODEC</span>
+                    <span class="toolbox-card-title tool-card-title">Unicode 编解码</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        在普通文本、Unicode 转义、HTML 实体与 Unicode 码点之间双向转换。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
+
+            <a href="/tools/background-cutout" class="toolbox-card tool-card toolbox-card-wide"
+               data-tool="cutout" data-reveal data-reveal-delay="3">
+                <span class="toolbox-card-topline">
+                    <span>07 / IMAGE</span>
+                    <span class="toolbox-card-state"><i aria-hidden="true"></i> LOCAL</span>
+                </span>
+                <span class="toolbox-card-icon tool-card-icon" aria-hidden="true">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </span>
+                <span class="toolbox-card-copy">
+                    <span class="toolbox-card-label">IMAGE PROCESSING</span>
+                    <span class="toolbox-card-title tool-card-title">智能吸色抠图</span>
+                    <span class="toolbox-card-description tool-card-desc">
+                        吸取图片背景色并调节容差，本地生成透明 PNG，或导出 WebP、JPEG 文件。
+                    </span>
+                </span>
+                <span class="toolbox-card-action read-more">
+                    打开工具 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </span>
+            </a>
+        </div>
+    </section>
+
+    <section class="toolbox-assurance" data-reveal aria-labelledby="toolbox-assurance-title">
+        <span class="toolbox-assurance-icon" aria-hidden="true">
+            <i class="fa-solid fa-fingerprint"></i>
+        </span>
+        <div class="toolbox-assurance-copy">
+            <span>LOCAL-FIRST BY DEFAULT</span>
+            <h2 id="toolbox-assurance-title">你的数据，应当留在你的设备上。</h2>
+            <p>这些工具的核心处理逻辑运行于浏览器端，适合临时处理代码、参数和其他不希望上传的数据。</p>
+        </div>
+        <a href="/" class="toolbox-assurance-link">
+            返回数字花园 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+        </a>
+    </section>
+</div>
 {% endblock %}

@@ -2,6 +2,8 @@ import binascii
 import struct
 import zlib
 
+from fastapi.testclient import TestClient
+
 
 def _post_payload(**overrides):
     payload = {
@@ -60,6 +62,74 @@ def test_healthz_uses_temporary_database(app_bundle):
     assert response.json() == {"status": "ok", "environment": "test"}
     assert app_bundle.database_path.exists()
     assert app_bundle.database_path.parent == app_bundle.upload_dir.parent
+
+
+def test_browser_404_uses_custom_page_while_api_keeps_json(app_bundle):
+    page_response = app_bundle.client.get(
+        "/missing-page",
+        headers={"Accept": "text/html"},
+    )
+    api_response = app_bundle.client.get(
+        "/api/missing-endpoint",
+        headers={"Accept": "text/html"},
+    )
+
+    assert page_response.status_code == 404
+    assert page_response.headers["content-type"].startswith("text/html")
+    assert "404" in page_response.text
+    assert "这条路径没有留下内容" in page_response.text
+    assert "/missing-page" in page_response.text
+    assert "accept" in page_response.headers["vary"].lower()
+    assert page_response.headers["cache-control"] == "no-store"
+
+    assert api_response.status_code == 404
+    assert api_response.headers["content-type"].startswith("application/json")
+    assert api_response.json() == {"detail": "Not Found"}
+    assert "accept" in api_response.headers["vary"].lower()
+
+
+def test_browser_500_uses_custom_page_without_leaking_exception(app_bundle):
+    def raise_page_error():
+        raise RuntimeError("sensitive-error-marker")
+
+    app_bundle.main.app.add_api_route(
+        "/__integration__/page-error",
+        raise_page_error,
+        methods=["GET"],
+    )
+    app_bundle.main.app.add_api_route(
+        "/api/__integration__/page-error",
+        raise_page_error,
+        methods=["GET"],
+    )
+
+    with TestClient(
+        app_bundle.main.app,
+        base_url="https://testserver",
+        raise_server_exceptions=False,
+    ) as client:
+        page_response = client.get(
+            "/__integration__/page-error",
+            headers={"Accept": "text/html"},
+        )
+        api_response = client.get(
+            "/api/__integration__/page-error",
+            headers={"Accept": "text/html"},
+        )
+
+    assert page_response.status_code == 500
+    assert page_response.headers["content-type"].startswith("text/html")
+    assert "这里遇到了一点意外" in page_response.text
+    assert "REFERENCE" in page_response.text
+    assert "sensitive-error-marker" not in page_response.text
+    assert page_response.headers["cache-control"] == "no-store"
+    assert page_response.headers["x-content-type-options"] == "nosniff"
+
+    assert api_response.status_code == 500
+    assert api_response.headers["content-type"].startswith("application/json")
+    assert api_response.json()["detail"] == "Internal server error"
+    assert "reference" in api_response.json()
+    assert "sensitive-error-marker" not in api_response.text
 
 
 def test_anonymous_admin_redirect_and_write_api_rejection(app_bundle):

@@ -1,41 +1,55 @@
 {% extends "base.html" %}
 
 {% block title %}JSON 格式化与校验 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
-
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">📁 JSON 格式化与校验</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">在本地粘贴并对 JSON 字符串进行校验、缩进美化或单行压缩，确保您的关键敏感数据不离开浏览器。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / DATA INSPECTOR</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon" aria-hidden="true"><i class="fa-solid fa-code"></i></span>
+                    JSON 格式化与校验
+                </h1>
+                <p class="tool-detail-description">校验、美化或压缩 JSON，并在文本与可折叠树形视图之间切换。数据始终留在浏览器中。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> 数据不上传</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> 树形视图</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Workspace -->
-    <div class="tool-page-layout">
+    <div class="tool-page-layout tool-workbench json-workbench">
         
         <!-- Controls Toolbar -->
-        <div class="tool-header-row">
-            <div class="toolbar-controls">
-                <label style="font-size: 13px; color: var(--text-secondary);">缩进格式：</label>
+        <div class="tool-header-row tool-action-bar" data-reveal data-reveal-delay="1">
+            <div class="toolbar-controls tool-action-group tool-action-group-options">
+                <label for="indent-select" class="tool-action-label">缩进格式</label>
                 <select id="indent-select" class="tool-select">
                     <option value="2">2 个空格</option>
                     <option value="4" selected>4 个空格</option>
                     <option value="tab">Tab 缩进</option>
                 </select>
-                <button id="format-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                <button type="button" id="format-btn" class="btn btn-primary">
                     <i class="fa-solid fa-code"></i> 美化格式
                 </button>
-                <button id="minify-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                <button type="button" id="minify-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-compress"></i> 压缩一行
                 </button>
             </div>
-            <div class="toolbar-controls">
-                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+            <div class="toolbar-controls tool-action-group tool-action-group-secondary">
+                <button type="button" id="clear-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-trash-can"></i> 清空
                 </button>
-                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                <button type="button" id="copy-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-copy"></i> 复制结果
                 </button>
             </div>
@@ -45,16 +59,16 @@
         <div class="tool-workspace">
             
             <!-- Left panel: Raw Input -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="2">
                 <div class="panel-title-bar">
-                    <span>RAW JSON 输入</span>
-                    <span id="char-count">0 字符</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-file-code" aria-hidden="true"></i> RAW JSON 输入</span>
+                    <span id="char-count" class="tool-panel-status">0 字符</span>
                 </div>
                 <textarea id="raw-json-input" class="tool-textarea" placeholder='在此处粘贴或输入 JSON 字符串，例如：{"name": "unrecycle", "version": 1.0, "active": true, "tags": ["python", "fastapi"]}' autocomplete="off" spellcheck="false"></textarea>
             </div>
             
             <!-- Right panel: Highlighted Output -->
-            <div class="panel-container" id="right-output-panel">
+            <div class="panel-container tool-workspace-panel" id="right-output-panel" data-reveal data-reveal-delay="3">
                 <style>
                     /* Collapsible Tree Styles */
                     .json-details {
@@ -77,13 +91,10 @@
                         gap: 6px;
                         padding: 2px 4px;
                         border-radius: 4px;
-                        transition: background 0.2s;
+                        transition: background-color 180ms ease;
                     }
                     .json-summary::-webkit-details-marker {
                         display: none;
-                    }
-                    .json-summary:hover {
-                        background: rgba(255, 255, 255, 0.05);
                     }
                     .json-toggle {
                         display: inline-block;
@@ -118,33 +129,38 @@
                         background: transparent;
                         color: var(--text-secondary);
                         cursor: pointer;
-                        transition: var(--transition-smooth);
+                        transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
                     }
                     .view-tab-btn.active {
                         background: rgba(255, 255, 255, 0.08);
                         color: var(--text-primary);
                         border-color: rgba(255, 255, 255, 0.2);
                     }
+                    @media (hover: hover) and (pointer: fine) {
+                        .json-summary:hover {
+                            background: rgba(255, 255, 255, 0.05);
+                        }
+                    }
                 </style>
-                <div class="panel-title-bar" style="padding: 6px 16px;">
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button id="tab-text-btn" class="view-tab-btn active">文本视图</button>
-                        <button id="tab-tree-btn" class="view-tab-btn">树形视图 (可收起)</button>
+                <div class="panel-title-bar json-panel-title-bar">
+                    <div class="json-view-tabs" role="tablist" aria-label="JSON 输出视图">
+                        <button type="button" id="tab-text-btn" class="view-tab-btn active" role="tab" aria-selected="true" aria-controls="formatted-json-output">文本视图</button>
+                        <button type="button" id="tab-tree-btn" class="view-tab-btn" role="tab" aria-selected="false" aria-controls="tree-json-output">树形视图</button>
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <button id="expand-all-btn" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; display: none;">展开全部</button>
-                        <button id="collapse-all-btn" class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; display: none;">收起全部</button>
-                        <span id="format-status" style="color: var(--text-muted);">空</span>
+                    <div class="json-view-actions">
+                        <button type="button" id="expand-all-btn" class="btn btn-secondary json-tree-action" style="display: none;">展开全部</button>
+                        <button type="button" id="collapse-all-btn" class="btn btn-secondary json-tree-action" style="display: none;">收起全部</button>
+                        <span id="format-status" class="tool-panel-status" aria-live="polite">空</span>
                     </div>
                 </div>
                 
                 <!-- Text Area output -->
-                <div id="formatted-json-output" class="formatted-output-container">
+                <div id="formatted-json-output" class="formatted-output-container" role="tabpanel" aria-labelledby="tab-text-btn">
                     <span style="color: var(--text-muted); font-style: italic;">格式化后的 JSON 将在此处输出...</span>
                 </div>
                 
                 <!-- Tree representation output -->
-                <div id="tree-json-output" class="formatted-output-container" style="display: none;">
+                <div id="tree-json-output" class="formatted-output-container" role="tabpanel" aria-labelledby="tab-tree-btn" style="display: none;">
                     <span style="color: var(--text-muted); font-style: italic;">树形视图将在此处输出...</span>
                 </div>
             </div>
@@ -154,6 +170,7 @@
         <!-- Validation Error Message Banner -->
         <div id="validation-error" class="error-banner"></div>
     </div>
+</section>
 
 {% endblock %}
 
@@ -477,6 +494,8 @@
         activeTab = 'text';
         tabTextBtn.classList.add('active');
         tabTreeBtn.classList.remove('active');
+        tabTextBtn.setAttribute('aria-selected', 'true');
+        tabTreeBtn.setAttribute('aria-selected', 'false');
         
         formattedOutput.style.display = 'block';
         treeOutput.style.display = 'none';
@@ -489,6 +508,8 @@
         activeTab = 'tree';
         tabTreeBtn.classList.add('active');
         tabTextBtn.classList.remove('active');
+        tabTreeBtn.setAttribute('aria-selected', 'true');
+        tabTextBtn.setAttribute('aria-selected', 'false');
         
         formattedOutput.style.display = 'none';
         treeOutput.style.display = 'block';

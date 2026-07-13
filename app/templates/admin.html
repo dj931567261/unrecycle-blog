@@ -1,56 +1,72 @@
 {% extends "base.html" %}
 
 {% block title %}管理控制台 | Unrecycle-Me{% endblock %}
+{% block body_class %}admin-body{% endblock %}
 
 {% block content %}
-    <style>
-        .admin-quick-tag {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-secondary);
-            cursor: pointer;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-            user-select: none;
-        }
-        .admin-quick-tag:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
-            border-color: var(--accent-blue) !important;
-            color: var(--text-primary) !important;
-        }
-    </style>
+    <div class="admin-page">
+        <header class="admin-hero" data-reveal>
+            <div class="admin-hero-copy">
+                <span class="page-kicker"><span aria-hidden="true">●</span> PRIVATE / CONSOLE</span>
+                <h1>内容管理控制台</h1>
+                <p>欢迎回来，{{ username }}。在这里维护文章、网址目录与灵感收藏。</p>
+            </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; margin-top: 20px;">
-        <div>
-            <h1 style="font-size: 32px; font-weight: 800;">⚙️ 系统管理后台</h1>
-            <p style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">欢迎回来，{{ username }}。在此管理你主页的全部内容。</p>
-        </div>
-        <div>
-            <a href="/" class="btn btn-secondary"><i class="fa-solid fa-house"></i> 返回首页</a>
-        </div>
-    </div>
+            <div class="admin-hero-actions">
+                <span class="admin-session-status"><span aria-hidden="true"></span> SESSION ACTIVE</span>
+                <a href="/" class="btn btn-secondary">
+                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                    查看网站
+                </a>
+            </div>
+
+            <div class="admin-overview" aria-label="内容概览">
+                <div class="admin-overview-item">
+                    <span>WRITING</span>
+                    <strong>{{ post_pagination.total if post_pagination else posts|length }}</strong>
+                    <small>篇文章</small>
+                </div>
+                <div class="admin-overview-item">
+                    <span>DIRECTORY</span>
+                    <strong>{{ nav_links|length }}</strong>
+                    <small>个网址</small>
+                </div>
+                <div class="admin-overview-item">
+                    <span>GARDEN</span>
+                    <strong>{{ bookmark_pagination.total if bookmark_pagination else bookmarks|length }}</strong>
+                    <small>条收藏</small>
+                </div>
+            </div>
+        </header>
 
     <!-- Admin Operations Tabs -->
-    <div class="glass-card" style="padding: 24px; border-color: rgba(255,255,255,0.08);">
+    <section class="admin-console" aria-label="内容管理区域" data-reveal data-reveal-delay="1">
         
         <!-- Tab Selector Headers -->
-        <div class="admin-tab-nav">
-            <button class="admin-tab-btn active" data-admin-tab="posts-tab" onclick="switchTab('posts-tab', this)">
-                <i class="fa-solid fa-book-open" style="margin-right: 6px;"></i> 博客文章管理
+        <div class="admin-tab-nav" role="tablist" aria-label="内容类型">
+            <button id="posts-tab-button" class="admin-tab-btn active" type="button" role="tab"
+                    aria-selected="true" aria-controls="posts-tab" data-admin-tab="posts-tab"
+                    onclick="switchTab('posts-tab', this)">
+                <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                <span>博客文章</span>
             </button>
-            <button class="admin-tab-btn" data-admin-tab="navs-tab" onclick="switchTab('navs-tab', this)">
-                <i class="fa-solid fa-compass" style="margin-right: 6px;"></i> 导航链接管理
+            <button id="navs-tab-button" class="admin-tab-btn" type="button" role="tab"
+                    aria-selected="false" aria-controls="navs-tab" tabindex="-1"
+                    data-admin-tab="navs-tab" onclick="switchTab('navs-tab', this)">
+                <i class="fa-solid fa-compass" aria-hidden="true"></i>
+                <span>导航链接</span>
             </button>
-            <button class="admin-tab-btn" data-admin-tab="bookmarks-tab" onclick="switchTab('bookmarks-tab', this)">
-                <i class="fa-solid fa-bookmark" style="margin-right: 6px;"></i> 灵感书签管理
+            <button id="bookmarks-tab-button" class="admin-tab-btn" type="button" role="tab"
+                    aria-selected="false" aria-controls="bookmarks-tab" tabindex="-1"
+                    data-admin-tab="bookmarks-tab" onclick="switchTab('bookmarks-tab', this)">
+                <i class="fa-solid fa-bookmark" aria-hidden="true"></i>
+                <span>灵感书签</span>
             </button>
-
         </div>
 
         <!-- TAB 1: POSTS -->
-        <div id="posts-tab" class="admin-tab-content active">
+        <div id="posts-tab" class="admin-tab-content active" role="tabpanel"
+             aria-labelledby="posts-tab-button">
             <div class="action-row">
                 <button class="btn btn-primary" onclick="openPostModal()"><i class="fa-solid fa-plus"></i> 新建技术文章</button>
             </div>
@@ -115,7 +131,8 @@
         </div>
 
         <!-- TAB 2: NAVIGATION LINKS -->
-        <div id="navs-tab" class="admin-tab-content">
+        <div id="navs-tab" class="admin-tab-content" role="tabpanel"
+             aria-labelledby="navs-tab-button" hidden>
             <div class="action-row">
                 <button class="btn btn-primary" onclick="openNavLinkModal()"><i class="fa-solid fa-plus"></i> 新建导航链接</button>
             </div>
@@ -167,7 +184,8 @@
         </div>
 
         <!-- TAB 3: BOOKMARKS -->
-        <div id="bookmarks-tab" class="admin-tab-content">
+        <div id="bookmarks-tab" class="admin-tab-content" role="tabpanel"
+             aria-labelledby="bookmarks-tab-button" hidden>
             <div class="action-row">
                 <button class="btn btn-primary" onclick="openBookmarkModal()"><i class="fa-solid fa-plus"></i> 新建收藏书签</button>
             </div>
@@ -232,17 +250,17 @@
                 </nav>
             {% endif %}
         </div>
-
-
-
+    </section>
     </div>
 
     <!-- MODAL 1: POST (CREATE/EDIT) -->
-    <div id="post-modal" class="modal-backdrop">
+    <div id="post-modal" class="modal-backdrop" role="dialog" aria-modal="true"
+         aria-labelledby="post-modal-title" aria-hidden="true">
         <div class="glass-card admin-modal" style="width: 85vw; max-width: 1000px; padding: 24px;">
             <div class="modal-header">
                 <h3 id="post-modal-title">撰写技术博文</h3>
-                <button class="modal-close" onclick="closePostModal()">&times;</button>
+                <button class="modal-close" type="button" aria-label="关闭文章编辑弹窗"
+                        onclick="closePostModal()">&times;</button>
             </div>
             <form id="post-form">
                 <input type="hidden" id="post-id">
@@ -314,11 +332,13 @@
     </div>
 
     <!-- MODAL 2: NAV LINK -->
-    <div id="nav-modal" class="modal-backdrop">
+    <div id="nav-modal" class="modal-backdrop" role="dialog" aria-modal="true"
+         aria-labelledby="nav-modal-title" aria-hidden="true">
         <div class="glass-card admin-modal" style="max-width: 550px; padding: 24px;">
             <div class="modal-header">
                 <h3 id="nav-modal-title">新建网址导航</h3>
-                <button class="modal-close" onclick="closeNavLinkModal()">&times;</button>
+                <button class="modal-close" type="button" aria-label="关闭导航编辑弹窗"
+                        onclick="closeNavLinkModal()">&times;</button>
             </div>
             <form id="nav-form">
                 <input type="hidden" id="nav-id">
@@ -363,11 +383,13 @@
     </div>
 
     <!-- MODAL 3: BOOKMARK -->
-    <div id="bookmark-modal" class="modal-backdrop">
+    <div id="bookmark-modal" class="modal-backdrop" role="dialog" aria-modal="true"
+         aria-labelledby="bookmark-modal-title" aria-hidden="true">
         <div class="glass-card admin-modal" style="max-width: 550px; padding: 24px;">
             <div class="modal-header">
                 <h3 id="bookmark-modal-title">新建网页收藏</h3>
-                <button class="modal-close" onclick="closeBookmarkModal()">&times;</button>
+                <button class="modal-close" type="button" aria-label="关闭收藏编辑弹窗"
+                        onclick="closeBookmarkModal()">&times;</button>
             </div>
             <form id="bookmark-form">
                 <input type="hidden" id="bookmark-id">
@@ -413,16 +435,39 @@
     function switchTab(tabId, btn) {
         document.querySelectorAll('.admin-tab-content').forEach(content => {
             content.classList.remove('active');
+            content.hidden = true;
         });
         document.querySelectorAll('.admin-tab-btn').forEach(button => {
             button.classList.remove('active');
+            button.setAttribute('aria-selected', 'false');
+            button.tabIndex = -1;
         });
-        document.getElementById(tabId).classList.add('active');
+        const targetPanel = document.getElementById(tabId);
+        targetPanel.hidden = false;
+        targetPanel.classList.add('active');
         btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        btn.tabIndex = 0;
         if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${tabId}`);
         }
     }
+
+    const adminTabButtons = Array.from(document.querySelectorAll('.admin-tab-btn'));
+    adminTabButtons.forEach((button, index) => {
+        button.addEventListener('keydown', event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === 'ArrowRight') nextIndex = (index + 1) % adminTabButtons.length;
+            if (event.key === 'ArrowLeft') nextIndex = (index - 1 + adminTabButtons.length) % adminTabButtons.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = adminTabButtons.length - 1;
+            const nextButton = adminTabButtons[nextIndex];
+            switchTab(nextButton.dataset.adminTab, nextButton);
+            nextButton.focus();
+        });
+    });
 
     const initialAdminTab = window.location.hash.slice(1);
     if (initialAdminTab) {
@@ -434,11 +479,35 @@
     }
 
     // Modal management helpers
+    let lastAdminModalTrigger = null;
+
     function showModal(modalId) {
-        document.getElementById(modalId).classList.add('open');
+        const modal = document.getElementById(modalId);
+        lastAdminModalTrigger = document.activeElement;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        window.requestAnimationFrame(() => {
+            const focusTarget = modal.querySelector('form input:not([type="hidden"]), form textarea, form select')
+                || modal.querySelector('.modal-close');
+            focusTarget?.focus();
+        });
     }
+
     function hideModal(modalId) {
-        document.getElementById(modalId).classList.remove('open');
+        const modal = document.getElementById(modalId);
+        if (modal.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        if (!document.querySelector('.modal-backdrop.open')) {
+            document.body.classList.remove('modal-open');
+        }
+        if (lastAdminModalTrigger instanceof HTMLElement && lastAdminModalTrigger.isConnected) {
+            lastAdminModalTrigger.focus();
+        }
+        lastAdminModalTrigger = null;
     }
 
     function redirectToLogin() {
@@ -470,19 +539,37 @@
         }
     }
 
-    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+    const adminModals = document.querySelectorAll('#post-modal, #nav-modal, #bookmark-modal');
+    adminModals.forEach(modal => {
         modal.addEventListener('click', event => {
             if (event.target === modal && !modal.querySelector('button[type="submit"]:disabled')) {
-                modal.classList.remove('open');
+                hideModal(modal.id);
+            }
+        });
+
+        modal.addEventListener('keydown', event => {
+            if (event.key !== 'Tab' || !modal.classList.contains('open')) return;
+            const focusable = Array.from(modal.querySelectorAll(
+                'button:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled]), a[href]'
+            )).filter(element => element.getClientRects().length > 0);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
             }
         });
     });
 
     window.addEventListener('keydown', event => {
         if (event.key !== 'Escape') return;
-        const openModal = document.querySelector('.modal-backdrop.open');
+        const openModal = document.querySelector('#post-modal.open, #nav-modal.open, #bookmark-modal.open');
         if (openModal && !openModal.querySelector('button[type="submit"]:disabled')) {
-            openModal.classList.remove('open');
+            hideModal(openModal.id);
         }
     });
 

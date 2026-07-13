@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}卦象密码翻译器 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
 
@@ -48,12 +49,6 @@
         .history-table tbody tr {
             transition: background-color 0.2s ease;
         }
-        .history-table tbody tr:hover {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        html[data-theme="light"] .history-table tbody tr:hover {
-            background: rgba(15, 23, 42, 0.02);
-        }
         .history-badge {
             display: inline-block;
             padding: 2px 8px;
@@ -91,72 +86,94 @@
             border-radius: 4px;
             transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
         }
-        .history-action-btn:hover {
-            color: var(--text-primary);
-            background: var(--bg-btn-hover);
-            border-color: var(--border-color);
-        }
-        .history-action-btn.delete:hover {
-            color: var(--error);
-            background: rgba(239, 68, 68, 0.08);
-            border-color: rgba(239, 68, 68, 0.2);
+        @media (hover: hover) and (pointer: fine) {
+            .history-table tbody tr:hover {
+                background: rgba(255, 255, 255, 0.02);
+            }
+            html[data-theme="light"] .history-table tbody tr:hover {
+                background: rgba(15, 23, 42, 0.02);
+            }
+            .history-action-btn:hover {
+                color: var(--text-primary);
+                background: var(--bg-btn-hover);
+                border-color: var(--border-color);
+            }
+            .history-action-btn.delete:hover {
+                color: var(--error);
+                background: rgba(239, 68, 68, 0.08);
+                border-color: rgba(239, 68, 68, 0.2);
+            }
         }
     </style>
 
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">☯️ 卦象密码翻译器</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">将普通文本隐写为周易六十四卦象符号，或将卦象密文还原为原文。支持自动识别与本地安全编解码。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / SYMBOL CIPHER</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon tool-detail-icon-glyph" aria-hidden="true">☯</span>
+                    卦象密码翻译器
+                </h1>
+                <p class="tool-detail-description">将普通文本隐写为周易六十四卦象，或将卦象密文还原。支持智能识别与本地历史记录。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> 智能识别</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> 本地历史</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Workspace -->
-    <div class="tool-page-layout">
+    <div class="tool-page-layout tool-workbench hexagram-workbench">
         
         <!-- Controls Toolbar -->
-        <div class="tool-header-row">
-            <div class="toolbar-controls">
-                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+        <div class="tool-header-row tool-action-bar" data-reveal data-reveal-delay="1">
+            <div class="toolbar-controls tool-action-group">
+                <button type="button" id="encode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-lock"></i> 卦象加密
                 </button>
-                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+                <button type="button" id="decode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-unlock"></i> 卦象解密
                 </button>
-                <button id="auto-btn" class="btn btn-primary" style="padding: 8px 16px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none;">
+                <button type="button" id="auto-btn" class="btn btn-primary tool-smart-action">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> 智能转换
                 </button>
             </div>
-            <div class="toolbar-controls">
-                <button id="paste-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+            <div class="toolbar-controls tool-action-group tool-action-group-secondary">
+                <button type="button" id="paste-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-clipboard"></i> 粘贴
                 </button>
-                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                <button type="button" id="clear-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-trash-can"></i> 清空
                 </button>
-                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 16px;">
+                <button type="button" id="copy-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-copy"></i> 复制结果
                 </button>
             </div>
         </div>
 
         <!-- Input / Output workspace split -->
-        <div class="tool-workspace" style="margin-bottom: 0;">
+        <div class="tool-workspace">
             
             <!-- Left panel: Raw Input -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="2">
                 <div class="panel-title-bar">
-                    <span>输入需要转换的内容</span>
-                    <span id="char-count">0 字符</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> 输入需要转换的内容</span>
+                    <span id="char-count" class="tool-panel-status">0 字符</span>
                 </div>
                 <textarea id="text-input" class="tool-textarea" placeholder="在此输入普通明文或要解密的卦象密文内容..." autocomplete="off" spellcheck="false"></textarea>
             </div>
             
             <!-- Right panel: Processed Output -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="3">
                 <div class="panel-title-bar">
-                    <span>转换输出结果</span>
-                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-terminal" aria-hidden="true"></i> 转换输出结果</span>
+                    <span id="codec-status" class="tool-panel-status" aria-live="polite">就绪</span>
                 </div>
                 <textarea id="text-output" readonly class="tool-textarea" style="font-family: monospace; font-size: 18px; letter-spacing: 2px;" placeholder="结果将在此显示..."></textarea>
             </div>
@@ -167,12 +184,16 @@
         <div id="validation-error" class="error-banner" style="margin-top: 15px;"></div>
 
         <!-- History Panel -->
-        <div class="history-container glass-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-blue);"></i> 历史加解密记录 (本地存储)
-                </h3>
-                <button id="clear-history-btn" class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;">
+        <div class="history-container glass-card tool-history-panel" data-reveal data-reveal-delay="4">
+            <div class="tool-history-heading">
+                <div>
+                    <span class="tool-detail-kicker">RECENT ACTIVITY</span>
+                    <h2 class="tool-history-title">
+                        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> 历史加解密记录
+                    </h2>
+                    <p>仅保存在当前浏览器，最多保留 100 条。</p>
+                </div>
+                <button type="button" id="clear-history-btn" class="btn btn-secondary tool-history-clear">
                     <i class="fa-solid fa-trash-can"></i> 清空历史
                 </button>
             </div>
@@ -185,6 +206,7 @@
         </div>
 
     </div>
+</section>
 
 {% endblock %}
 

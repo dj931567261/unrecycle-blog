@@ -1,42 +1,72 @@
 {% extends "base.html" %}
 
 {% block title %}管理员登录 | Unrecycle-Me{% endblock %}
+{% block body_class %}login-body{% endblock %}
 
 {% block content %}
+    <section class="login-page" aria-labelledby="login-page-title">
+        <div class="login-intro" data-reveal>
+            <span class="page-kicker"><span aria-hidden="true">●</span> ADMIN / ACCESS</span>
+            <h1 id="login-page-title">回到你的<br>内容控制台。</h1>
+            <p>
+                在一个安静、专注的工作区里管理文章、网址目录和灵感书签。
+                登录状态仅保存在安全的 HttpOnly Cookie 中。
+            </p>
 
-    <div class="login-container">
-        <div class="glass-card" style="padding: 40px; border-color: rgba(255,255,255,0.09);">
-            
-            <div class="login-header">
-                <div style="font-size: 32px; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">
-                    <i class="fa-solid fa-user-shield"></i>
-                </div>
-                <h2>系统管理登录</h2>
-                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">登录以管理博客、导航链接和收藏书签</p>
+            <div class="login-capabilities" aria-label="后台功能">
+                <span><i class="fa-solid fa-pen-nib" aria-hidden="true"></i> 撰写与发布</span>
+                <span><i class="fa-solid fa-compass" aria-hidden="true"></i> 整理数字花园</span>
+                <span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> 安全会话</span>
             </div>
-            
-            <!-- Login Form -->
-            <form id="login-form">
+
+            <a class="editorial-back-link" href="/">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                返回公开主页
+            </a>
+        </div>
+
+        <div class="login-panel" data-reveal data-reveal-delay="1">
+            <div class="login-panel-header">
+                <span class="login-panel-mark" aria-hidden="true">U/</span>
+                <div>
+                    <span class="login-panel-index">SECURE SESSION</span>
+                    <h2>管理员登录</h2>
+                </div>
+            </div>
+
+            <form id="login-form" class="login-form">
                 <div class="form-group">
                     <label for="username">管理员账号</label>
-                    <input type="text" id="username" required class="form-control" placeholder="输入管理员用户名" autocomplete="username">
+                    <div class="login-input-wrap">
+                        <i class="fa-regular fa-user" aria-hidden="true"></i>
+                        <input type="text" id="username" required class="form-control"
+                               placeholder="输入管理员用户名" autocomplete="username">
+                    </div>
                 </div>
-                
-                <div class="form-group" style="margin-bottom: 24px;">
+
+                <div class="form-group">
                     <label for="password">安全密码</label>
-                    <input type="password" id="password" required class="form-control" placeholder="输入管理员密码" autocomplete="current-password">
+                    <div class="login-input-wrap">
+                        <i class="fa-solid fa-key" aria-hidden="true"></i>
+                        <input type="password" id="password" required class="form-control"
+                               placeholder="输入管理员密码" autocomplete="current-password">
+                    </div>
                 </div>
-                
-                <div id="login-error" class="error-banner" style="margin-bottom: 16px; margin-top: 0;"></div>
-                
-                <button id="login-submit-btn" type="submit" class="btn btn-primary" style="width: 100%; padding: 12px 20px; font-size: 15px;">
-                    <i class="fa-solid fa-right-to-bracket"></i> 验证并登录
+
+                <div id="login-error" class="error-banner login-error" role="alert" aria-live="polite"></div>
+
+                <button id="login-submit-btn" type="submit" class="btn btn-primary login-submit">
+                    <span>验证并登录</span>
+                    <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                 </button>
             </form>
-            
-        </div>
-    </div>
 
+            <p class="login-panel-note">
+                <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                凭据只发送到本站登录接口，不会写入浏览器存储。
+            </p>
+        </div>
+    </section>
 {% endblock %}
 
 {% block scripts %}

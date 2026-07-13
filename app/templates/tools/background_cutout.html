@@ -1,33 +1,47 @@
 {% extends "base.html" %}
 
 {% block title %}智能吸色抠图 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
-
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🎨 智能吸色抠图</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">在本地纯客户端对图片进行吸色和扣除背景，支持容差调节并导出 PNG/WebP 透明图。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / IMAGE LAB</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon" aria-hidden="true"><i class="fa-solid fa-eye-dropper"></i></span>
+                    智能吸色抠图
+                </h1>
+                <p class="tool-detail-description">吸取图片背景色，通过容差精细抠图，并导出 PNG、WebP 或 JPEG。图片不会离开本地。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-image" aria-hidden="true"></i> Canvas 处理</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> 图片不上传</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Workspace -->
-    <div class="tool-page-layout">
+    <div class="tool-page-layout tool-workbench cutout-workbench">
         
         <!-- Input / Output workspace split -->
-        <div class="tool-workspace">
+        <div class="tool-workspace cutout-workspace">
 
             <!-- Left panel: Controls -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="1">
                 <div class="panel-title-bar">
-                    <span>配置与控制</span>
-                    <span style="color: var(--text-muted);"><i class="fa-solid fa-sliders"></i> 参数</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-sliders" aria-hidden="true"></i> 配置与控制</span>
+                    <span class="tool-panel-status">PARAMETERS</span>
                 </div>
                 <div class="control-panel-body">
                     
                     <!-- 1. Upload Section -->
-                    <div id="drop-zone" class="upload-drop-zone">
+                    <div id="drop-zone" class="upload-drop-zone" role="button" tabindex="0" aria-label="选择或拖入图片">
                         <i class="fa-solid fa-cloud-arrow-up" style="font-size: 32px; margin-bottom: 12px; color: var(--accent-blue);"></i>
                         <div class="upload-title">拖拽图片到这里 或 <span class="upload-link">点击上传</span></div>
                         <div class="upload-hint">支持 PNG, JPG, JPEG, WEBP 格式</div>
@@ -36,7 +50,7 @@
                     
                     <!-- 2. Target Color Section -->
                     <div class="control-group-title">1. 背景吸色</div>
-                    <button id="picker-btn" class="btn btn-secondary" style="width: 100%; margin-bottom: 12px; height: 42px;" disabled>
+                    <button type="button" id="picker-btn" class="btn btn-secondary cutout-full-action" disabled>
                         <i class="fa-solid fa-eye-dropper"></i> 点击开始吸色
                     </button>
                     
@@ -70,7 +84,7 @@
                     </div>
                     
                     <!-- 5. Download Button -->
-                    <button id="download-btn" class="btn btn-primary" style="width: 100%; height: 44px; margin-top: 8px;" disabled>
+                    <button type="button" id="download-btn" class="btn btn-primary cutout-full-action cutout-download-action" disabled>
                         <i class="fa-solid fa-download"></i> 导出并保存图片
                     </button>
                     
@@ -78,10 +92,10 @@
             </div>
 
             <!-- Right panel: Canvas Preview -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="2">
                 <div class="panel-title-bar">
-                    <span>处理预览区</span>
-                    <span id="image-dimensions" style="color: var(--text-muted);">暂无图片</span>
+                    <span class="tool-panel-label"><i class="fa-regular fa-image" aria-hidden="true"></i> 处理预览区</span>
+                    <span id="image-dimensions" class="tool-panel-status" aria-live="polite">暂无图片</span>
                 </div>
                 
                 <div class="preview-canvas-container checkerboard-bg" id="preview-container">
@@ -108,6 +122,7 @@
         </div>
         <div id="cutout-error" class="error-banner" style="margin-top: 16px;"></div>
     </div>
+</section>
 
 {% endblock %}
 
@@ -144,11 +159,10 @@
         text-align: center;
         background: rgba(255, 255, 255, 0.01);
         cursor: pointer;
-        transition: var(--transition-smooth);
+        transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
         margin-bottom: 20px;
-        will-change: transform;
     }
-    .upload-drop-zone:hover, .upload-drop-zone.dragover {
+    .upload-drop-zone.dragover {
         border-color: var(--accent-blue);
         background: var(--bg-input-focus);
         transform: scale(0.99);
@@ -157,8 +171,20 @@
     html[data-theme="light"] .upload-drop-zone {
         background: rgba(0, 0, 0, 0.01);
     }
-    html[data-theme="light"] .upload-drop-zone:hover, html[data-theme="light"] .upload-drop-zone.dragover {
+    html[data-theme="light"] .upload-drop-zone.dragover {
         background: rgba(15, 23, 42, 0.03);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .upload-drop-zone:hover {
+            border-color: var(--accent-blue);
+            background: var(--bg-input-focus);
+            transform: scale(0.99);
+        }
+
+        html[data-theme="light"] .upload-drop-zone:hover {
+            background: rgba(15, 23, 42, 0.03);
+        }
     }
     
     .upload-title {
@@ -422,6 +448,13 @@
     // 1. Upload Logic (Click and Drag/Drop)
     dropZone.addEventListener("click", () => {
         uploadInput.click();
+    });
+
+    dropZone.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            uploadInput.click();
+        }
     });
     
     uploadInput.addEventListener("change", (e) => {

@@ -1,161 +1,219 @@
 {% extends "base.html" %}
 
-{% block title %}Unrecycle-Me | 个人主页与技术博客{% endblock %}
+{% block title %}Unrecycle-Me | 技术、工具与数字花园{% endblock %}
+{% block description %}一个持续生长的个人技术编辑部：记录博客、收藏灵感、整理常用网址与开发工具。{% endblock %}
+{% block body_class %}home-body{% endblock %}
 
 {% block content %}
-
-    <!-- Profile Card (Avatar, Bio, and Social links) -->
-    <div class="profile-card">
-        <div class="avatar-wrapper">
-            <!-- Sleek SVG avatar with nice linear gradient -->
-            <svg class="avatar-image" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                    <linearGradient id="avatar-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#3b82f6" />
-                        <stop offset="50%" stop-color="#8b5cf6" />
-                        <stop offset="100%" stop-color="#ec4899" />
-                    </linearGradient>
-                </defs>
-                <rect x="-1" y="-1" width="102" height="102" fill="url(#avatar-grad)" />
-                <text x="50" y="60" font-size="34" font-family="'Outfit', sans-serif" font-weight="900" fill="#ffffff" text-anchor="middle">UM</text>
-            </svg>
-        </div>
-        <div class="profile-info">
-            <h1>你好，我是开发者 👋</h1>
-            <p>全栈软件工程师 / 技术探索者。欢迎来到我的数字主页。这里记录了我的日常思考、常用工具以及好站收藏。</p>
-            <div class="social-links">
-                <a href="https://github.com/dj931567261" target="_blank" rel="noopener noreferrer" class="btn-icon" title="GitHub"><i class="fa-brands fa-github"></i></a>
-                <a href="mailto:dj931567261@gmail.com" class="btn-icon" title="Email"><i class="fa-solid fa-envelope"></i></a>
-                <a href="/tools" class="btn-icon" title="开发者小工具箱"><i class="fa-solid fa-toolbox"></i></a>
+<div class="home-page">
+    <section class="editorial-hero" aria-labelledby="home-title">
+        <div class="editorial-hero-copy" data-reveal>
+            <div class="editorial-kicker">
+                <span class="status-dot" aria-hidden="true"></span>
+                Personal technology journal · 2026
+            </div>
+            <h1 id="home-title" class="editorial-title">
+                构建、记录，<br>
+                让灵感持续生长。
+            </h1>
+            <p class="editorial-deck">
+                这里是 Unrecycle.me，一个由代码、技术文章、实用工具和好站收藏组成的个人数字空间。
+                我在这里整理正在学习的东西，也保存值得再次打开的链接。
+            </p>
+            <div class="editorial-actions">
+                <a href="/blog" class="btn btn-primary editorial-primary-action">
+                    阅读最新文章 <i class="fa-solid fa-arrow-right"></i>
+                </a>
+                <a href="/tools" class="btn btn-secondary">打开工具箱</a>
+            </div>
+            <div class="editorial-socials" aria-label="个人链接">
+                <a href="https://github.com/dj931567261" target="_blank" rel="noopener noreferrer">
+                    <i class="fa-brands fa-github"></i> GitHub
+                </a>
+                <a href="mailto:dj931567261@gmail.com">
+                    <i class="fa-regular fa-envelope"></i> Email
+                </a>
+                <span><i class="fa-solid fa-location-dot"></i> Building on the web</span>
             </div>
         </div>
-    </div>
 
-    <!-- Search Box Trigger (Aesthetic overlay trigger) -->
-    <div class="search-wrapper" onclick="openSearch()">
-        <input type="text" readonly class="search-input" placeholder="输入关键字搜索博客、导航或收藏... (Cmd + K)">
-        <div class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
-        <div style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px; border: 1px solid var(--border-color); padding: 2px 6px; border-radius: 4px; pointer-events: none;">Cmd K</div>
-    </div>
+        <aside class="editorial-identity" data-reveal data-reveal-delay="1" aria-label="个人技术名片">
+            <div class="identity-header">
+                <span>UNRECYCLE / PROFILE</span>
+                <span class="identity-state"><i></i> ONLINE</span>
+            </div>
+            <div class="identity-monogram" aria-hidden="true">
+                <span>U</span><span>/</span>
+            </div>
+            <dl class="identity-list">
+                <div>
+                    <dt>ROLE</dt>
+                    <dd>Full-stack developer</dd>
+                </div>
+                <div>
+                    <dt>FOCUS</dt>
+                    <dd>FastAPI · Android · Automation</dd>
+                </div>
+                <div>
+                    <dt>NOW</dt>
+                    <dd>Building useful things</dd>
+                </div>
+            </dl>
+            <div class="identity-code" aria-hidden="true">
+                <span>01</span><span>10</span><span>11</span><span>00</span><span>01</span><span>10</span>
+            </div>
+        </aside>
+    </section>
 
-    <!-- Navigation Dashboard Category grids -->
-    <div class="dashboard-section" style="margin-bottom: 40px;">
-        <h2 class="section-title">
-            <span><i class="fa-solid fa-compass" style="margin-right: 8px; color: var(--accent-blue);"></i> 网址导航</span>
-        </h2>
-        
-        {% if categorized_links %}
-            {% for category, links in categorized_links.items() %}
-                <div class="nav-grid-category">
-                    <h3 class="category-name">{{ category }}</h3>
-                    <div class="nav-links-grid">
-                        {% for link in links %}
-                            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="nav-card">
-                                <div class="nav-card-icon">
-                                    {% if link.icon %}
-                                        {{ link.icon }}
-                                    {% else %}
-                                        📌
+    <button class="home-command" type="button" data-search-trigger data-reveal data-reveal-delay="2"
+            aria-haspopup="dialog">
+        <span class="home-command-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <span class="home-command-copy">
+            <strong>搜索整个数字空间</strong>
+            <small>文章、导航、收藏，一次找到</small>
+        </span>
+        <kbd>⌘ K</kbd>
+    </button>
+
+    <section class="home-section" aria-labelledby="latest-writing-title">
+        <header class="home-section-header" data-reveal>
+            <div>
+                <span class="home-section-index">01 / WRITING</span>
+                <h2 id="latest-writing-title">最近博文</h2>
+            </div>
+            <a href="/blog" class="editorial-view-all">全部文章 <i class="fa-solid fa-arrow-right"></i></a>
+        </header>
+
+        <div class="editorial-layout">
+            <div class="editorial-feed">
+                {% if recent_posts %}
+                    {% for post in recent_posts %}
+                        <article class="editorial-story{% if loop.first %} editorial-story-lead{% endif %}"
+                                 data-reveal data-reveal-delay="{{ (loop.index0 % 4) + 1 }}">
+                            <a href="/blog/{{ post.slug }}" class="editorial-story-link">
+                                <div class="editorial-story-number">0{{ loop.index }}</div>
+                                <div class="editorial-story-content">
+                                    <div class="editorial-story-meta">
+                                        <span>{{ post.category }}</span>
+                                        <time>{{ post.created_at | datetime }}</time>
+                                        <span><i class="fa-regular fa-eye"></i> {{ post.views }}</span>
+                                    </div>
+                                    <h3>{{ post.title }}</h3>
+                                    {% if loop.first %}
+                                        <p>{{ post.summary or "阅读全文，了解这篇文章的完整内容。" }}</p>
+                                    {% endif %}
+                                    {% if post.tags %}
+                                        <div class="editorial-story-tags" aria-label="文章标签">
+                                            {% for tag in post.tags.split(',') %}
+                                                <span>#{{ tag.strip() }}</span>
+                                            {% endfor %}
+                                        </div>
                                     {% endif %}
                                 </div>
-                                <div class="nav-card-info">
-                                    <div class="nav-card-title">{{ link.title }}</div>
-                                    <div class="nav-card-desc">{{ link.description or "无网站描述" }}</div>
-                                </div>
+                                <span class="editorial-story-arrow" aria-hidden="true">
+                                    <i class="fa-solid fa-arrow-up-right"></i>
+                                </span>
                             </a>
-                        {% endfor %}
+                        </article>
+                    {% endfor %}
+                {% else %}
+                    <div class="editorial-empty" data-reveal>
+                        <span>NO STORIES YET</span>
+                        <p>暂无已发布文章，新的内容正在准备中。</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <aside class="garden-rail">
+                <div class="garden-panel" data-reveal data-reveal-delay="2">
+                    <div class="garden-panel-header">
+                        <div>
+                            <span>GARDEN NOTES</span>
+                            <h2>灵感书签</h2>
+                        </div>
+                        <a href="/bookmarks" aria-label="查看全部收藏"><i class="fa-solid fa-arrow-right"></i></a>
+                    </div>
+                    {% if bookmarks %}
+                        <div class="garden-notes">
+                            {% for bookmark in bookmarks[:5] %}
+                                <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" class="garden-note">
+                                    <span class="garden-note-marker" aria-hidden="true"></span>
+                                    <span class="garden-note-copy">
+                                        <strong>{{ bookmark.title }}</strong>
+                                        <small>{{ bookmark.description or "值得再次打开的收藏" }}</small>
+                                    </span>
+                                    <i class="fa-solid fa-arrow-up-right garden-note-arrow" aria-hidden="true"></i>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="garden-panel-empty">还没有收藏内容。</p>
+                    {% endif %}
+                </div>
+
+                <div class="utility-panel" data-reveal data-reveal-delay="3">
+                    <div class="utility-panel-heading">
+                        <span>UTILITY SHELF</span>
+                        <h2>常用工具</h2>
+                    </div>
+                    <div class="utility-links">
+                        <a href="/tools/json-formatter"><i class="fa-solid fa-code"></i><span>JSON</span></a>
+                        <a href="/tools/timestamp-converter"><i class="fa-regular fa-clock"></i><span>时间戳</span></a>
+                        <a href="/tools/base64"><i class="fa-solid fa-arrow-right-arrow-left"></i><span>Base64</span></a>
+                        <a href="/tools/background-cutout"><i class="fa-regular fa-image"></i><span>图片抠图</span></a>
                     </div>
                 </div>
-            {% endfor %}
+            </aside>
+        </div>
+    </section>
+
+    <section class="home-section garden-directory" aria-labelledby="garden-directory-title">
+        <header class="home-section-header" data-reveal>
+            <div>
+                <span class="home-section-index">02 / DIRECTORY</span>
+                <h2 id="garden-directory-title">数字花园目录</h2>
+            </div>
+            <p>把常用网址整理成随时可回到的入口。</p>
+        </header>
+
+        {% if categorized_links %}
+            <div class="garden-category-list">
+                {% for category, links in categorized_links.items() %}
+                    <section class="garden-category" data-reveal data-reveal-delay="{{ (loop.index0 % 4) + 1 }}">
+                        <div class="garden-category-heading">
+                            <span>0{{ loop.index }}</span>
+                            <h3>{{ category }}</h3>
+                        </div>
+                        <div class="garden-link-grid">
+                            {% for link in links %}
+                                <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="garden-link">
+                                    <span class="garden-link-icon" aria-hidden="true">{{ link.icon or "↗" }}</span>
+                                    <span class="garden-link-copy">
+                                        <strong>{{ link.title }}</strong>
+                                        <small>{{ link.description or "打开这个网站" }}</small>
+                                    </span>
+                                    <i class="fa-solid fa-arrow-up-right garden-link-arrow" aria-hidden="true"></i>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% endfor %}
+            </div>
         {% else %}
-            <div class="glass-card" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                <i class="fa-solid fa-compass" style="font-size: 32px; margin-bottom: 12px; color: var(--text-muted);"></i>
+            <div class="editorial-empty" data-reveal>
+                <span>EMPTY DIRECTORY</span>
                 <p>暂无网址导航，请登录后台添加。</p>
             </div>
         {% endif %}
-    </div>
+    </section>
 
-    <!-- Split column layouts for recent blog posts & bookmarks -->
-    <div class="home-layout-grid">
-        
-        <!-- Left: Recent Blog Posts -->
-        <div class="blog-feed-column">
-            <h2 class="section-title">
-                <span><i class="fa-solid fa-book-open" style="margin-right: 8px; color: var(--accent-purple);"></i> 最近博文</span>
-                <a href="/blog" class="view-all">查看全部 <i class="fa-solid fa-arrow-right"></i></a>
-            </h2>
-            
-            {% if recent_posts %}
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    {% for post in recent_posts %}
-                        <article class="glass-card post-card">
-                            <div class="post-meta">
-                                <span class="post-category">{{ post.category }}</span>
-                                <span>&bull;</span>
-                                <span>{{ post.created_at | datetime }}</span>
-                                <span>&bull;</span>
-                                <span><i class="fa-solid fa-eye"></i> {{ post.views }} 次阅读</span>
-                            </div>
-                            <a href="/blog/{{ post.slug }}">
-                                <h3 class="post-card-title">{{ post.title }}</h3>
-                            </a>
-                            <p class="post-card-summary">{{ post.summary or "阅读全文..." }}</p>
-                            <div class="post-card-footer">
-                                <div class="tags-list">
-                                    {% if post.tags %}
-                                        {% for tag in post.tags.split(',') %}
-                                            <span class="tag-badge">#{{ tag.strip() }}</span>
-                                        {% endfor %}
-                                    {% endif %}
-                                </div>
-                                <a href="/blog/{{ post.slug }}" class="read-more">阅读全文 <i class="fa-solid fa-angle-right"></i></a>
-                            </div>
-                        </article>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="glass-card" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    <p>暂无博客文章，请登录后台撰写。</p>
-                </div>
-            {% endif %}
+    <section class="home-closing" data-reveal>
+        <span class="home-closing-mark" aria-hidden="true">U/</span>
+        <div>
+            <span>KEEP BUILDING · KEEP WRITING</span>
+            <h2>这里不是完成品，而是一座持续更新的数字花园。</h2>
         </div>
-        
-        <!-- Right: Recent Bookmarks -->
-        <div class="bookmarks-feed-column">
-            <h2 class="section-title">
-                <span><i class="fa-solid fa-bookmark" style="margin-right: 8px; color: var(--accent-pink);"></i> 灵感书签</span>
-                <a href="/bookmarks" class="view-all">查看全部 <i class="fa-solid fa-arrow-right"></i></a>
-            </h2>
-            
-            {% if bookmarks %}
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    {% for bookmark in bookmarks %}
-                        <div class="glass-card bookmark-card">
-                            <div class="bookmark-header">
-                                <span class="tag-badge" style="background: rgba(236, 72, 153, 0.1); color: var(--accent-pink); font-weight: 600;">书签</span>
-                                <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" class="bookmark-link-btn">
-                                    打开网站 <i class="fa-solid fa-external-link" style="font-size: 11px;"></i>
-                                </a>
-                            </div>
-                            <h3 class="bookmark-title">{{ bookmark.title }}</h3>
-                            <p class="bookmark-desc">{{ bookmark.description or "无收藏说明" }}</p>
-                            {% if bookmark.tags %}
-                                <div class="tags-list">
-                                    {% for tag in bookmark.tags.split(',') %}
-                                        <span class="tag-badge" style="font-size: 10px;">{{ tag.strip() }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="glass-card" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    <p>暂无网页收藏，请登录后台添加。</p>
-                </div>
-            {% endif %}
-        </div>
-        
-    </div>
-
+        <a href="/blog">继续阅读 <i class="fa-solid fa-arrow-right"></i></a>
+    </section>
+</div>
 {% endblock %}

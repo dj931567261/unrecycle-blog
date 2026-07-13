@@ -1,111 +1,162 @@
 {% extends "base.html" %}
 
 {% block title %}灵感书签 | Unrecycle-Me{% endblock %}
+{% block description %}收录值得再次打开的网站、文章、开源项目与数字灵感，并按标签整理成持续生长的个人收藏档案。{% endblock %}
+{% block body_class %}bookmark-archive-body{% endblock %}
 
 {% block content %}
+<div class="bookmark-archive-page">
+    <section class="bookmark-archive-hero" aria-labelledby="bookmark-archive-title">
+        <div class="bookmark-archive-hero-copy" data-reveal>
+            <span class="bookmark-archive-kicker">
+                <span class="status-dot" aria-hidden="true"></span>
+                03 / GARDEN ARCHIVE
+            </span>
+            <h1 id="bookmark-archive-title">把值得重访的灵感，<br>留在数字花园里。</h1>
+            <p>
+                这里收录日常阅读、开源探索和学习途中遇见的优质网站、文章与工具。
+                它们不是稍后再读的堆积，而是一份持续整理的个人知识索引。
+            </p>
+        </div>
 
-    <style>
-        .filter-tag-btn {
-            display: inline-flex;
-            align-items: center;
-            padding: 6px 14px;
-            font-size: 13px;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-            background: rgba(255, 255, 255, 0.02);
-            color: var(--text-secondary);
-            cursor: pointer;
-            text-decoration: none;
-            transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .filter-tag-btn:hover {
-            border-color: var(--accent-blue);
-            color: var(--text-primary);
-            background: rgba(59, 130, 246, 0.05);
-        }
-        .filter-tag-btn.active {
-            border-color: var(--accent-blue);
-            background: rgba(59, 130, 246, 0.15);
-            color: var(--text-primary);
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
-        }
-    </style>
+        <aside class="bookmark-archive-summary" data-reveal data-reveal-delay="1"
+               aria-label="收藏档案概览">
+            <div class="bookmark-archive-summary-head">
+                <span>ARCHIVE / INDEX</span>
+                <i class="fa-regular fa-bookmark" aria-hidden="true"></i>
+            </div>
+            <dl class="bookmark-archive-stats">
+                <div>
+                    <dt>ENTRIES</dt>
+                    <dd>{{ pagination.total }}</dd>
+                </div>
+                <div>
+                    <dt>TAGS</dt>
+                    <dd>{{ tags | length }}</dd>
+                </div>
+                <div>
+                    <dt>PAGE</dt>
+                    <dd>{{ pagination.page }} / {{ pagination.total_pages }}</dd>
+                </div>
+            </dl>
+            <div class="bookmark-archive-current">
+                <span>CURRENT VIEW</span>
+                <strong>{{ selected_tag or "全部收藏" }}</strong>
+            </div>
+        </aside>
+    </section>
 
-    <div style="margin-bottom: 30px; margin-top: 20px;">
-        <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">📌 灵感与好站书签</h1>
-        <p style="color: var(--text-secondary); max-width: 600px;">这里记录了我日常浏览网页、查阅 GitHub 开源项目或学习时随手保存的一些优质网站、文章和工具，方便随时回溯。</p>
-    </div>
-
-    <!-- Tags Filter Bar -->
     {% if tags %}
-    <div class="tags-filter-bar" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; align-items: center; background: rgba(255,255,255,0.01); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
-        <span style="font-size: 13px; color: var(--text-muted); margin-right: 6px; display: flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-filter"></i> 标签过滤:
-        </span>
-        <a class="filter-tag-btn{% if not selected_tag %} active{% endif %}"
-           href="/bookmarks?page=1&page_size={{ pagination.page_size }}">全部</a>
-        {% for tag in tags %}
-            <a class="filter-tag-btn{% if selected_tag == tag %} active{% endif %}"
-               href="/bookmarks?page=1&page_size={{ pagination.page_size }}&tag={{ tag | urlencode }}">{{ tag }}</a>
-        {% endfor %}
-    </div>
+        <nav class="bookmark-filter" data-reveal data-reveal-delay="2" aria-label="按标签筛选收藏">
+            <div class="bookmark-filter-heading">
+                <span><i class="fa-solid fa-filter" aria-hidden="true"></i> FILTER BY TAG</span>
+                <small>选择标签以缩小收藏范围</small>
+            </div>
+            <div class="bookmark-filter-list">
+                <a class="filter-tag-btn{% if not selected_tag %} active{% endif %}"
+                   href="/bookmarks?page=1&amp;page_size={{ pagination.page_size }}"
+                   {% if not selected_tag %}aria-current="page"{% endif %}>全部</a>
+                {% for tag in tags %}
+                    <a class="filter-tag-btn{% if selected_tag == tag %} active{% endif %}"
+                       href="/bookmarks?page=1&amp;page_size={{ pagination.page_size }}&amp;tag={{ tag | urlencode }}"
+                       {% if selected_tag == tag %}aria-current="page"{% endif %}>{{ tag }}</a>
+                {% endfor %}
+            </div>
+        </nav>
     {% endif %}
 
-    <!-- Bookmarks Grid -->
-    <div class="bookmarks-grid">
+    <section class="bookmark-archive-section" aria-labelledby="bookmark-list-title">
+        <header class="bookmark-archive-section-head" data-reveal>
+            <div>
+                <span class="bookmark-archive-section-index">FIELD NOTES / {{ "%02d" | format(pagination.page) }}</span>
+                <h2 id="bookmark-list-title">
+                    {% if selected_tag %}
+                        “{{ selected_tag }}”相关收藏
+                    {% else %}
+                        全部灵感条目
+                    {% endif %}
+                </h2>
+            </div>
+            <p>当前共 {{ pagination.total }} 条记录</p>
+        </header>
+
         {% if bookmarks %}
-            {% for bookmark in bookmarks %}
-                <div class="glass-card bookmark-card" data-tags="{{ bookmark.tags or '' }}">
-                    <div class="bookmark-header">
-                        <span class="tag-badge" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); font-weight: 600;"># 收藏</span>
-                        <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer" class="bookmark-link-btn">
-                            访问原网站 <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i>
+            <div class="bookmark-ledger bookmarks-grid">
+                {% for bookmark in bookmarks %}
+                    <article class="bookmark-entry bookmark-card" data-tags="{{ bookmark.tags or '' }}"
+                             data-reveal data-reveal-delay="{{ (loop.index0 % 4) + 1 }}">
+                        <a class="bookmark-entry-link" href="{{ bookmark.url }}" target="_blank"
+                           rel="noopener noreferrer" aria-label="访问收藏：{{ bookmark.title }}">
+                            <span class="bookmark-entry-number" aria-hidden="true">
+                                {{ (pagination.page - 1) * pagination.page_size + loop.index }}
+                            </span>
+                            <span class="bookmark-entry-content">
+                                <span class="bookmark-entry-topline">
+                                    <span class="bookmark-entry-type">FIELD NOTE</span>
+                                    <time>{{ bookmark.created_at | datetime("%Y · %m · %d") }}</time>
+                                </span>
+                                <span class="bookmark-entry-title bookmark-title">{{ bookmark.title }}</span>
+                                <span class="bookmark-entry-description bookmark-desc">
+                                    {{ bookmark.description or "没有附加说明，但值得再次打开。" }}
+                                </span>
+                                <span class="bookmark-entry-footer">
+                                    <span class="bookmark-entry-tags tags-list" aria-label="收藏标签">
+                                        {% if bookmark.tags %}
+                                            {% for tag in bookmark.tags.split(',') %}
+                                                <span class="bookmark-entry-tag tag-badge">#{{ tag.strip() }}</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="bookmark-entry-tag tag-badge">#未分类</span>
+                                        {% endif %}
+                                    </span>
+                                    <span class="bookmark-entry-action bookmark-link-btn">
+                                        访问原网站
+                                        <i class="fa-solid fa-arrow-up-right" aria-hidden="true"></i>
+                                    </span>
+                                </span>
+                            </span>
                         </a>
-                    </div>
-                    <h3 class="bookmark-title">{{ bookmark.title }}</h3>
-                    <p class="bookmark-desc">{{ bookmark.description or "无收藏说明" }}</p>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.04);">
-                        <div class="tags-list">
-                            {% if bookmark.tags %}
-                                {% for tag in bookmark.tags.split(',') %}
-                                    <span class="tag-badge" style="font-size: 10px;">{{ tag.strip() }}</span>
-                                {% endfor %}
-                            {% endif %}
-                        </div>
-                        <span style="font-size: 11px; color: var(--text-muted);">{{ bookmark.created_at | datetime("%m-%d") }}</span>
-                    </div>
-                </div>
-            {% endfor %}
+                    </article>
+                {% endfor %}
+            </div>
         {% else %}
-            <div class="glass-card" style="grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-secondary);">
-                <i class="fa-solid fa-bookmark" style="font-size: 40px; margin-bottom: 16px; color: var(--text-muted);"></i>
+            <div class="bookmark-archive-empty editorial-empty" data-reveal>
+                <span>NO FIELD NOTES</span>
                 {% if selected_tag %}
-                    <p>标签“{{ selected_tag }}”下暂无收藏。</p>
+                    <p>标签“{{ selected_tag }}”下暂无收藏，试试切换到其他标签。</p>
+                    <a href="/bookmarks?page=1&amp;page_size={{ pagination.page_size }}" class="btn btn-secondary">
+                        查看全部收藏
+                    </a>
                 {% else %}
-                    <p>暂无灵感书签。快登录管理后台添加吧！</p>
+                    <p>数字花园里还没有收藏，新的灵感正在路上。</p>
                 {% endif %}
                 {% if is_admin %}
-                    <a href="/admin" class="btn btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-plus"></i> 添加收藏</a>
+                    <a href="/admin#bookmarks-tab" class="btn btn-primary">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i> 添加收藏
+                    </a>
                 {% endif %}
             </div>
         {% endif %}
-    </div>
+    </section>
 
     {% if pagination and pagination.total_pages > 1 %}
-        <nav class="pagination-controls" aria-label="收藏分页">
+        <nav class="bookmark-pagination pagination-controls" aria-label="收藏分页" data-reveal>
             {% if pagination.page > 1 %}
-                <a class="btn btn-secondary" href="/bookmarks?page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}{% if selected_tag %}&tag={{ selected_tag | urlencode }}{% endif %}">
-                    <i class="fa-solid fa-angle-left"></i> 上一页
+                <a class="btn btn-secondary bookmark-pagination-link" rel="prev"
+                   href="/bookmarks?page={{ pagination.page - 1 }}&amp;page_size={{ pagination.page_size }}{% if selected_tag %}&amp;tag={{ selected_tag | urlencode }}{% endif %}">
+                    <i class="fa-solid fa-angle-left" aria-hidden="true"></i> 上一页
                 </a>
             {% endif %}
-            <span>第 {{ pagination.page }} / {{ pagination.total_pages }} 页，共 {{ pagination.total }} 条</span>
+            <span class="bookmark-pagination-status">
+                第 {{ pagination.page }} / {{ pagination.total_pages }} 页，共 {{ pagination.total }} 条
+            </span>
             {% if pagination.page < pagination.total_pages %}
-                <a class="btn btn-secondary" href="/bookmarks?page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}{% if selected_tag %}&tag={{ selected_tag | urlencode }}{% endif %}">
-                    下一页 <i class="fa-solid fa-angle-right"></i>
+                <a class="btn btn-secondary bookmark-pagination-link" rel="next"
+                   href="/bookmarks?page={{ pagination.page + 1 }}&amp;page_size={{ pagination.page_size }}{% if selected_tag %}&amp;tag={{ selected_tag | urlencode }}{% endif %}">
+                    下一页 <i class="fa-solid fa-angle-right" aria-hidden="true"></i>
                 </a>
             {% endif %}
         </nav>
     {% endif %}
-
+</div>
 {% endblock %}

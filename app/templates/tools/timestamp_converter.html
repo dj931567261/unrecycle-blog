@@ -1,62 +1,54 @@
 {% extends "base.html" %}
 
 {% block title %}Unix 时间戳转换 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
 
-<style>
-    .live-time-board {
-        margin-bottom: 24px;
-        padding: 20px;
-        border-color: rgba(139, 92, 246, 0.2) !important;
-        background: linear-gradient(135deg, rgba(18, 20, 25, 0.8), rgba(28, 20, 40, 0.5)) !important;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
-    }
-    
-    html[data-theme="light"] .live-time-board {
-        border-color: rgba(139, 92, 246, 0.25) !important;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(139, 92, 246, 0.08)) !important;
-    }
-    
-    .form-control[readonly] {
-        background: rgba(0, 0, 0, 0.15) !important;
-    }
-    
-    html[data-theme="light"] .form-control[readonly] {
-        background: rgba(15, 23, 42, 0.04) !important;
-    }
-</style>
-
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page timestamp-tool-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">⏱️ Unix 时间戳转换</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">在 Unix 时间戳（秒数/毫秒数）与人类可读的日期时间（北京时间 GMT+8 / UTC 国际标准时间）之间进行快速双向转换。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / TIME CONVERTER</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon" aria-hidden="true"><i class="fa-solid fa-clock"></i></span>
+                    Unix 时间戳转换
+                </h1>
+                <p class="tool-detail-description">在 Unix 秒、毫秒时间戳与可读日期之间双向转换，同时支持北京时间和 UTC。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-stopwatch" aria-hidden="true"></i> 实时时钟</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-earth-asia" aria-hidden="true"></i> GMT+8 / UTC</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Current Live Time display board -->
-    <div class="glass-card live-time-board">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-            <div>
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">当前实时系统时间</span>
-                <div style="display: flex; align-items: baseline; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
-                    <span id="live-time-str" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--text-primary);">2026-05-25 17:34:25</span>
-                    <span id="live-time-zone" style="font-size: 12px; color: var(--accent-purple); font-weight: 600;">GMT+8</span>
+    <div class="glass-card live-time-board timestamp-live-board" data-reveal data-reveal-delay="1">
+        <div class="timestamp-live-inner">
+            <div class="timestamp-live-block">
+                <span class="timestamp-data-label">当前实时系统时间</span>
+                <div class="timestamp-live-value-row">
+                    <span id="live-time-str" class="timestamp-live-value">2026-05-25 17:34:25</span>
+                    <span id="live-time-zone" class="timestamp-zone-badge">GMT+8</span>
                 </div>
             </div>
-            <div>
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Unix 时间戳</span>
-                <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
-                    <span id="live-stamp-sec" style="font-size: 22px; font-weight: 800; font-family: var(--font-mono); color: var(--accent-blue);">1779836065</span>
-                    <span style="font-size: 12px; color: var(--text-muted);">秒 (s)</span>
+            <div class="timestamp-live-block">
+                <span class="timestamp-data-label">Unix 时间戳</span>
+                <div class="timestamp-live-value-row">
+                    <span id="live-stamp-sec" class="timestamp-live-value timestamp-live-stamp">1779836065</span>
+                    <span class="timestamp-value-unit">秒 (s)</span>
                 </div>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button id="clock-toggle-btn" class="btn btn-secondary" style="padding: 8px 12px;" title="暂停时间刷新">
+            <div class="timestamp-live-actions">
+                <button type="button" id="clock-toggle-btn" class="btn btn-secondary" title="暂停时间刷新">
                     <i class="fa-solid fa-pause"></i> 暂停
                 </button>
-                <button id="clock-copy-btn" class="btn btn-primary" style="padding: 8px 12px;" title="复制当前时间戳">
+                <button type="button" id="clock-copy-btn" class="btn btn-primary" title="复制当前时间戳">
                     <i class="fa-solid fa-copy"></i> 复制秒
                 </button>
             </div>
@@ -64,23 +56,27 @@
     </div>
 
     <!-- Converter Grid -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 40px;">
+    <div class="timestamp-converter-grid">
         
         <!-- Left: Timestamp to Date -->
-        <div class="glass-card" style="display: flex; flex-direction: column; gap: 20px;">
-            <h3 style="font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-long" style="color: var(--accent-blue);"></i> 时间戳 ➔ 日期时间
-            </h3>
-            
-            <div class="form-group">
-                <label for="input-timestamp">Unix 时间戳 (Timestamp)</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="input-timestamp" class="form-control" style="font-family: var(--font-mono); font-size: 15px;" placeholder="例如: 1779836065">
-                    <button id="ts-to-date-current" class="btn btn-secondary" style="white-space: nowrap; padding: 0 12px;">当前值</button>
+        <section class="glass-card timestamp-converter-card" data-reveal data-reveal-delay="2">
+            <div class="timestamp-card-heading">
+                <span class="timestamp-card-index">01</span>
+                <div>
+                    <span class="tool-detail-kicker">TIMESTAMP TO DATE</span>
+                    <h2>时间戳 → 日期时间</h2>
                 </div>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+                <label for="input-timestamp">Unix 时间戳 (Timestamp)</label>
+                <div class="timestamp-inline-field">
+                    <input type="text" id="input-timestamp" class="form-control timestamp-mono-field" placeholder="例如: 1779836065">
+                    <button type="button" id="ts-to-date-current" class="btn btn-secondary">当前值</button>
+                </div>
+            </div>
+            
+            <div class="timestamp-options-grid">
                 <div class="form-group">
                     <label for="ts-unit">时间戳单位</label>
                     <select id="ts-unit" class="form-control" style="cursor: pointer;">
@@ -97,30 +93,34 @@
                 </div>
             </div>
             
-            <button id="btn-ts-to-date" class="btn btn-primary" style="width: 100%;"><i class="fa-solid fa-calculator"></i> 转换成日期时间</button>
+            <button type="button" id="btn-ts-to-date" class="btn btn-primary timestamp-convert-action"><i class="fa-solid fa-calculator"></i> 转换成日期时间</button>
             
             <div class="form-group" style="margin-top: 10px;">
-                <label>转换结果 (Date Time String)</label>
-                <div style="position: relative;">
-                    <input type="text" id="output-datetime" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-blue); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果将在此显示...">
-                    <button id="copy-output-date" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制结果">
+                <label for="output-datetime">转换结果 (Date Time String)</label>
+                <div class="timestamp-copy-field">
+                    <input type="text" id="output-datetime" readonly class="form-control timestamp-mono-field timestamp-output-field" placeholder="结果将在此显示...">
+                    <button type="button" id="copy-output-date" class="btn-icon timestamp-copy-action" title="复制结果" aria-label="复制日期时间结果">
                         <i class="fa-regular fa-copy"></i>
                     </button>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Right: Date to Timestamp -->
-        <div class="glass-card" style="display: flex; flex-direction: column; gap: 20px;">
-            <h3 style="font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-long" style="color: var(--accent-purple);"></i> 日期时间 ➔ 时间戳
-            </h3>
+        <section class="glass-card timestamp-converter-card" data-reveal data-reveal-delay="3">
+            <div class="timestamp-card-heading">
+                <span class="timestamp-card-index">02</span>
+                <div>
+                    <span class="tool-detail-kicker">DATE TO TIMESTAMP</span>
+                    <h2>日期时间 → 时间戳</h2>
+                </div>
+            </div>
             
             <div class="form-group">
                 <label for="input-datetime">日期时间字符串 (Date Time)</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="input-datetime" class="form-control" style="font-family: var(--font-mono); font-size: 15px;" placeholder="格式如: 2026-05-25 17:34:25">
-                    <button id="date-to-ts-current" class="btn btn-secondary" style="white-space: nowrap; padding: 0 12px;">当前值</button>
+                <div class="timestamp-inline-field">
+                    <input type="text" id="input-datetime" class="form-control timestamp-mono-field" placeholder="格式如: 2026-05-25 17:34:25">
+                    <button type="button" id="date-to-ts-current" class="btn btn-secondary">当前值</button>
                 </div>
             </div>
             
@@ -132,34 +132,35 @@
                 </select>
             </div>
             
-            <button id="btn-date-to-ts" class="btn btn-primary" style="width: 100%; background: var(--accent-gradient);"><i class="fa-solid fa-calculator"></i> 转换成时间戳</button>
+            <button type="button" id="btn-date-to-ts" class="btn btn-primary timestamp-convert-action"><i class="fa-solid fa-calculator"></i> 转换成时间戳</button>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+            <div class="timestamp-output-grid">
                 <div class="form-group">
-                    <label>秒数 (10位)</label>
-                    <div style="position: relative;">
-                        <input type="text" id="output-stamp-sec" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-purple); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果...">
-                        <button id="copy-output-stamp-sec" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制秒数">
+                    <label for="output-stamp-sec">秒数 (10位)</label>
+                    <div class="timestamp-copy-field">
+                        <input type="text" id="output-stamp-sec" readonly class="form-control timestamp-mono-field timestamp-output-field" placeholder="结果...">
+                        <button type="button" id="copy-output-stamp-sec" class="btn-icon timestamp-copy-action" title="复制秒数" aria-label="复制秒数时间戳">
                             <i class="fa-regular fa-copy"></i>
                         </button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>毫秒数 (13位)</label>
-                    <div style="position: relative;">
-                        <input type="text" id="output-stamp-ms" readonly class="form-control" style="font-family: var(--font-mono); font-weight: 600; color: var(--accent-purple); background: rgba(0,0,0,0.2); padding-right: 40px;" placeholder="结果...">
-                        <button id="copy-output-stamp-ms" class="btn-icon" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: transparent; width:30px; height:30px;" title="复制毫秒数">
+                    <label for="output-stamp-ms">毫秒数 (13位)</label>
+                    <div class="timestamp-copy-field">
+                        <input type="text" id="output-stamp-ms" readonly class="form-control timestamp-mono-field timestamp-output-field" placeholder="结果...">
+                        <button type="button" id="copy-output-stamp-ms" class="btn-icon timestamp-copy-action" title="复制毫秒数" aria-label="复制毫秒时间戳">
                             <i class="fa-regular fa-copy"></i>
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
         
     </div>
 
     <!-- Error Toast Notification Banner -->
     <div id="conversion-error" class="error-banner" style="margin-bottom: 40px;"></div>
+</section>
 
 {% endblock %}
 

@@ -1,36 +1,50 @@
 {% extends "base.html" %}
 
 {% block title %}Unicode 编解码 | Unrecycle-Me{% endblock %}
+{% block body_class %}tool-detail-body{% endblock %}
 
 {% block content %}
-
-    <div style="margin-top: 10px; margin-bottom: 20px;">
-        <a href="/tools" style="font-size: 14px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-arrow-left"></i> 返回工具箱
+<section class="tool-detail-page">
+    <header class="tool-detail-hero" data-reveal>
+        <a href="/tools" class="tool-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回工具箱</span>
         </a>
-        <h1 style="font-size: 26px; font-weight: 800; margin-top: 12px;">🔤 Unicode 编解码</h1>
-        <p style="color: var(--text-secondary); font-size: 14px;">在本地快速实现普通文本与 Unicode 编码（如 \uXXXX、HTML 实体、Unicode 码点等）之间的双向转换。</p>
-    </div>
+        <div class="tool-detail-heading">
+            <div>
+                <span class="tool-detail-kicker">LOCAL UTILITY / CHARACTER CODEC</span>
+                <h1 class="tool-detail-title">
+                    <span class="tool-detail-icon" aria-hidden="true"><i class="fa-solid fa-font"></i></span>
+                    Unicode 编解码
+                </h1>
+                <p class="tool-detail-description">在普通文本、Unicode 转义、HTML 实体和码点列表之间进行双向转换。</p>
+            </div>
+            <div class="tool-detail-meta" aria-label="工具特性">
+                <span class="tool-meta-chip"><i class="fa-solid fa-laptop-code" aria-hidden="true"></i> 本地处理</span>
+                <span class="tool-meta-chip"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> 5 种格式</span>
+            </div>
+        </div>
+    </header>
 
     <!-- Main Workspace -->
-    <div class="tool-page-layout">
+    <div class="tool-page-layout tool-workbench">
         
         <!-- Controls Toolbar -->
-        <div class="tool-header-row" style="flex-wrap: wrap; gap: 16px; justify-content: space-between;">
-            <div class="toolbar-controls" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                <button id="encode-btn" class="btn btn-primary" style="padding: 8px 16px;">
+        <div class="tool-header-row tool-action-bar tool-action-bar-wrap" data-reveal data-reveal-delay="1">
+            <div class="toolbar-controls tool-action-group tool-action-group-options">
+                <button type="button" id="encode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-lock"></i> Unicode 编码
                 </button>
-                <button id="decode-btn" class="btn btn-primary" style="padding: 8px 16px; background: var(--accent-gradient);">
+                <button type="button" id="decode-btn" class="btn btn-primary">
                     <i class="fa-solid fa-unlock"></i> Unicode 解码
                 </button>
                 
-                <span style="color: var(--text-muted); font-size: 14px; margin: 0 4px;">|</span>
+                <span class="tool-action-divider" aria-hidden="true"></span>
                 
                 <!-- Format Select -->
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <label for="unicode-format" style="font-size: 13px; color: var(--text-secondary); margin: 0; white-space: nowrap;">格式:</label>
-                    <select id="unicode-format" class="form-control" style="width: auto; padding: 6px 12px; font-size: 13px; cursor: pointer; height: auto; border-radius: 8px;">
+                <div class="tool-inline-option">
+                    <label for="unicode-format">格式</label>
+                    <select id="unicode-format" class="form-control tool-compact-select">
                         <option value="u" selected>\uXXXX (常用)</option>
                         <option value="u_braces">\u{X...} (ES6)</option>
                         <option value="html_hex">&#xXXXX; (HTML 16进制)</option>
@@ -40,25 +54,25 @@
                 </div>
 
                 <!-- Checkbox Options -->
-                <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); margin: 0; user-select: none;">
-                    <input type="checkbox" id="non-ascii-only" checked style="cursor: pointer; width: 15px; height: 15px;">
+                <label class="tool-check-option">
+                    <input type="checkbox" id="non-ascii-only" checked>
                     仅编码非 ASCII 字符
                 </label>
                 
-                <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); margin: 0; user-select: none;">
-                    <input type="checkbox" id="uppercase-hex" checked style="cursor: pointer; width: 15px; height: 15px;">
+                <label class="tool-check-option">
+                    <input type="checkbox" id="uppercase-hex" checked>
                     16进制大写
                 </label>
             </div>
             
-            <div class="toolbar-controls" style="display: flex; gap: 8px;">
-                <button id="swap-btn" class="btn btn-secondary" style="padding: 8px 12px;" title="交换输入与输出">
+            <div class="toolbar-controls tool-action-group tool-action-group-secondary">
+                <button type="button" id="swap-btn" class="btn btn-secondary" title="交换输入与输出">
                     <i class="fa-solid fa-right-left"></i> 交换
                 </button>
-                <button id="clear-btn" class="btn btn-secondary" style="padding: 8px 12px;">
+                <button type="button" id="clear-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-trash-can"></i> 清空
                 </button>
-                <button id="copy-btn" class="btn btn-secondary" style="padding: 8px 12px;">
+                <button type="button" id="copy-btn" class="btn btn-secondary">
                     <i class="fa-solid fa-copy"></i> 复制结果
                 </button>
             </div>
@@ -68,19 +82,19 @@
         <div class="tool-workspace">
             
             <!-- Left panel: Raw Input -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="2">
                 <div class="panel-title-bar">
-                    <span>输入原始文本 或 编码字符串</span>
-                    <span id="char-count">0 字符</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> 输入原始文本或编码字符串</span>
+                    <span id="char-count" class="tool-panel-status">0 字符</span>
                 </div>
                 <textarea id="text-input" class="tool-textarea" placeholder="在此输入需要编码的纯文本，或者输入需要解码的 Unicode 字符串 (如 \u4e2d\u6587)..." autocomplete="off" spellcheck="false"></textarea>
             </div>
             
             <!-- Right panel: Highlighted Output -->
-            <div class="panel-container">
+            <div class="panel-container tool-workspace-panel" data-reveal data-reveal-delay="3">
                 <div class="panel-title-bar">
-                    <span>处理输出结果</span>
-                    <span id="codec-status" style="color: var(--text-muted);">就绪</span>
+                    <span class="tool-panel-label"><i class="fa-solid fa-terminal" aria-hidden="true"></i> 处理输出结果</span>
+                    <span id="codec-status" class="tool-panel-status" aria-live="polite">就绪</span>
                 </div>
                 <textarea id="text-output" readonly class="tool-textarea" placeholder="处理后的结果将在此显示..."></textarea>
             </div>
@@ -90,6 +104,7 @@
         <!-- Validation Error Message Banner -->
         <div id="validation-error" class="error-banner"></div>
     </div>
+</section>
 
 {% endblock %}
 
