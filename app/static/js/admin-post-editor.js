@@ -297,37 +297,6 @@
         elements.wordCount.textContent = `${characterCount.toLocaleString('zh-CN')} 字 · 约 ${readingMinutes} 分钟阅读`;
     }
 
-    function preprocessMarkdown(text) {
-        if (!text) return '';
-        const lines = text.split(/\r?\n/);
-        const output = [];
-        const listItemPattern = /^\s*([-*+]|\d+\.)\s+/;
-
-        lines.forEach((line, index) => {
-            let processed = line;
-            const indentMatch = line.match(/^(\s*)([-*+]|\d+\.)(\s+)(.*)/);
-            if (indentMatch && indentMatch[1].length > 0) {
-                const indent = Math.max(4, Math.floor((indentMatch[1].length + 2) / 4) * 4);
-                processed = `${' '.repeat(indent)}${indentMatch[2]}${indentMatch[3]}${indentMatch[4]}`;
-            }
-
-            if (index > 0 && listItemPattern.test(processed)) {
-                const previous = lines[index - 1].trim();
-                if (
-                    previous &&
-                    !listItemPattern.test(previous) &&
-                    !previous.startsWith('#') &&
-                    !previous.startsWith('>') &&
-                    !previous.startsWith('`')
-                ) {
-                    output.push('');
-                }
-            }
-            output.push(processed);
-        });
-        return output.join('\n');
-    }
-
     function escapeRawHtml(markdown) {
         return String(markdown || '')
             .replace(/&/g, '&amp;')
@@ -357,7 +326,7 @@
 
     function sanitizePreview(markdown) {
         const fragmentTemplate = document.createElement('template');
-        const safeInput = escapeRawHtml(preprocessMarkdown(markdown));
+        const safeInput = escapeRawHtml(markdown);
         fragmentTemplate.innerHTML = window.marked.parse(safeInput, {
             gfm: true,
             breaks: true,

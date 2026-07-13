@@ -22,6 +22,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from jinja2 import TemplateNotFound
+from markdown.extensions import Extension
+from markdown.extensions.sane_lists import SaneOListProcessor, SaneUListProcessor
+from markdown.preprocessors import Preprocessor
 from sqlalchemy import inspect, or_, text
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -541,32 +544,186 @@ def sanitize_markdown_html(rendered_html: str) -> str:
     return sanitizer.get_html()
 
 
+_MARKDOWN_LIST_ITEM_RE = re.compile(
+    r"^(?P<indent> *)(?P<marker>[-*+]|\d+\.)(?P<spacing> +)(?P<content>.*)$"
+)
+_MARKDOWN_ORDERED_LIST_ITEM_RE = re.compile(r"^[ ]{0,3}\d+\.[ ]+")
+_MARKDOWN_UNORDERED_LIST_ITEM_RE = re.compile(r"^[ ]{0,3}[-*+][ ]+")
+
+
+def _markdown_list_content_indent(
+    source_indent: int,
+    marker: str,
+    spacing: str,
+) -> int:
+    """计算 CommonMark 列表项正文起始列。"""
+    padding = len(spacing) if len(spacing) <= 4 else 1
+    return source_indent + len(marker) + padding
+
+
+def _starts_new_markdown_block(stripped_line: str) -> bool:
+    return stripped_line.startswith(("#", ">", "\x02"))
+
+
+def _preprocess_markdown_lines(lines: list[str]) -> list[str]:
+    """把 CommonMark 风格的嵌套列表缩进映射为 Python-Markdown 层级。
+
+    此预处理器会在 fenced code 与原生 HTML 被 Markdown 暂存后运行，
+    因此不会修改代码块中的 Markdown 示例。
+    """
+    new_lines: list[str] = []
+    # 每层保存（原始 marker 缩进、该列表项正文的原始起始列）。
+    active_list_levels: list[tuple[int, int]] = []
+    saw_blank_line = False
+
+    def append_blank_line() -> None:
+        if new_lines and new_lines[-1].strip():
+            new_lines.append("")
+
+    for index, line in enumerate(lines):
+        if not line.strip():
+            new_lines.append(line)
+            saw_blank_line = True
+            continue
+
+        indent_match = _MARKDOWN_LIST_ITEM_RE.match(line)
+        if indent_match:
+            spaces = indent_match.group("indent")
+            marker = indent_match.group("marker")
+            post_spaces = indent_match.group("spacing")
+            content = indent_match.group("content")
+            source_indent = len(spaces)
+            had_list_context = bool(active_list_levels)
+            list_depth: Optional[int] = None
+
+            for level_index in range(len(active_list_levels) - 1, -1, -1):
+                if source_indent == active_list_levels[level_index][0]:
+                    list_depth = level_index
+                    break
+
+            if list_depth is None:
+                for level_index in range(len(active_list_levels) - 1, -1, -1):
+                    child_indent = active_list_levels[level_index][1]
+                    if child_indent <= source_indent <= child_indent + 3:
+                        list_depth = level_index + 1
+                        break
+
+            if list_depth is None and source_indent <= 3:
+                list_depth = 0
+
+            if list_depth is not None:
+                normalized_indent = source_indent if list_depth == 0 else list_depth * 4
+                processed_line = (
+                    " " * normalized_indent + marker + post_spaces + content
+                )
+                level = (
+                    source_indent,
+                    _markdown_list_content_indent(
+                        source_indent,
+                        marker,
+                        post_spaces,
+                    ),
+                )
+                active_list_levels[:] = active_list_levels[:list_depth]
+                active_list_levels.append(level)
+
+                if list_depth == 0 and not had_list_context and index > 0:
+                    previous_line = lines[index - 1].strip()
+                    if previous_line and not _MARKDOWN_LIST_ITEM_RE.match(
+                        previous_line
+                    ) and not previous_line.startswith(
+                        ("#", ">", "`", "- ", "* ", "+ ")
+                    ):
+                        append_blank_line()
+
+                new_lines.append(processed_line)
+                saw_blank_line = False
+                continue
+
+        stripped_line = line.lstrip(" ")
+        line_indent = len(line) - len(stripped_line)
+        if active_list_levels and line_indent <= 3 and (
+            saw_blank_line or _starts_new_markdown_block(stripped_line)
+        ):
+            active_list_levels.clear()
+
+        new_lines.append(line)
+        saw_blank_line = False
+
+    return new_lines
+
+
+class _MarkdownListPreprocessor(Preprocessor):
+    def run(self, lines: list[str]) -> list[str]:
+        return _preprocess_markdown_lines(lines)
+
+
+def _markdown_list_kind(line: str) -> Optional[str]:
+    if _MARKDOWN_ORDERED_LIST_ITEM_RE.match(line):
+        return "ordered"
+    if _MARKDOWN_UNORDERED_LIST_ITEM_RE.match(line):
+        return "unordered"
+    return None
+
+
+def _split_mixed_list_block(blocks: list[str]) -> None:
+    """一次扫描拆分同层级列表类型，避免交替列表出现二次复杂度。"""
+    lines = blocks[0].split("\n")
+    current_kind = _markdown_list_kind(lines[0])
+    segments: list[str] = []
+    segment_start = 0
+    for index, line in enumerate(lines[1:], start=1):
+        line_kind = _markdown_list_kind(line)
+        if line_kind is None or line_kind == current_kind:
+            continue
+        segments.append("\n".join(lines[segment_start:index]))
+        segment_start = index
+        current_kind = line_kind
+    if segments:
+        segments.append("\n".join(lines[segment_start:]))
+        blocks[0:1] = segments
+
+
+class _OrderedListProcessor(SaneOListProcessor):
+    def run(self, parent, blocks: list[str]):
+        _split_mixed_list_block(blocks)
+        return super().run(parent, blocks)
+
+
+class _UnorderedListProcessor(SaneUListProcessor):
+    def run(self, parent, blocks: list[str]):
+        _split_mixed_list_block(blocks)
+        return super().run(parent, blocks)
+
+
+class _BlogMarkdownExtension(Extension):
+    def extendMarkdown(self, md):
+        # fenced_code(25) 和 html_block(20) 会先暂存代码及原生 HTML；
+        # 列表预处理放在其后，避免改写代码示例中的列表标记。
+        md.preprocessors.register(
+            _MarkdownListPreprocessor(md),
+            "blog_mixed_lists",
+            15,
+        )
+        md.parser.blockprocessors.register(
+            _OrderedListProcessor(md.parser),
+            "olist",
+            40,
+        )
+        md.parser.blockprocessors.register(
+            _UnorderedListProcessor(md.parser),
+            "ulist",
+            30,
+        )
+
+
 def render_markdown(value: str) -> str:
     if not value:
         return ""
 
-    lines = value.splitlines()
-    new_lines: list[str] = []
-    list_item_pattern = re.compile(r"^\s*([-*+]|\d+\.)\s+")
-    for index, line in enumerate(lines):
-        indent_match = re.match(r"^(\s*)([-*+]|\d+\.)(\s+)(.*)", line)
-        processed_line = line
-        if indent_match:
-            spaces, bullet, post_spaces, content = indent_match.groups()
-            if spaces:
-                new_indent = max(4, ((len(spaces) + 2) // 4) * 4)
-                processed_line = " " * new_indent + bullet + post_spaces + content
-
-        if index > 0:
-            previous_line = lines[index - 1].strip()
-            if list_item_pattern.match(processed_line) and previous_line:
-                if not list_item_pattern.match(previous_line) and not previous_line.startswith(("#", ">", "`", "- ", "* ", "+ ")):
-                    new_lines.append("")
-        new_lines.append(processed_line)
-
     rendered = markdown.markdown(
-        "\n".join(new_lines),
-        extensions=["fenced_code", "tables", "toc", "nl2br"],
+        value,
+        extensions=["fenced_code", "tables", "toc", "nl2br", _BlogMarkdownExtension()],
     )
     return sanitize_markdown_html(rendered)
 

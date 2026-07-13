@@ -1,5 +1,6 @@
 import binascii
 import struct
+import xml.etree.ElementTree as ET
 import zlib
 
 from fastapi.testclient import TestClient
@@ -353,6 +354,168 @@ def test_search_never_returns_unpublished_posts(app_bundle):
     assert "visibility-marker published" in titles
     assert "visibility-marker draft" not in titles
     assert all(item.get("url") != "/blog/hidden-search-result" for item in items)
+
+
+def test_mixed_markdown_list_markers_keep_ordered_and_unordered_types(app_bundle):
+    content = """1. **Function Calling**:
+- Skills bullet marker
+2. **System Prompt**:
+- Prompt bullet marker
+3. **Reasoning Chain**:
+- Chain bullet marker
+
+1. Nested parent
+   - Nested bullet marker
+2. Nested second
+   - Second nested marker
+"""
+    with app_bundle.database.SessionLocal() as db:
+        db.add(
+            app_bundle.models.Post(
+                title="混合列表渲染测试",
+                slug="mixed-list-markers",
+                content=content,
+                summary="验证有序和无序列表不会互相转换",
+                category="测试",
+                tags="markdown,list",
+                is_published=True,
+            )
+        )
+        db.commit()
+
+    response = app_bundle.client.get("/blog/mixed-list-markers")
+    rendered = app_bundle.main.render_markdown(content)
+    root = ET.fromstring(f"<root>{rendered}</root>")
+
+    assert response.status_code == 200
+    assert [element.tag for element in root] == [
+        "ol",
+        "ul",
+        "ol",
+        "ul",
+        "ol",
+        "ul",
+        "ol",
+    ]
+    assert root[2].attrib == {"start": "2"}
+    assert root[4].attrib == {"start": "3"}
+    assert "".join(root[1][0].itertext()) == "Skills bullet marker"
+    assert "".join(root[3][0].itertext()) == "Prompt bullet marker"
+    assert "".join(root[5][0].itertext()) == "Chain bullet marker"
+
+    nested_list = root[6]
+    assert len(nested_list.findall("./li")) == 2
+    assert " ".join("".join(nested_list[0].itertext()).split()) == (
+        "Nested parent Nested bullet marker"
+    )
+    assert " ".join("".join(nested_list[1].itertext()).split()) == (
+        "Nested second Second nested marker"
+    )
+    assert nested_list[0].find("./ul/li").text == "Nested bullet marker"
+    assert nested_list[1].find("./ul/li").text == "Second nested marker"
+
+    assert "<ol start=\"2\">" in response.text
+    assert "<ol start=\"3\">" in response.text
+
+
+def test_markdown_code_blocks_are_not_changed_by_list_preprocessor(app_bundle):
+    content = """```markdown
+1. fenced ordered
+- fenced unordered
+```
+
+~~~text
+- tilde unordered
+2. tilde ordered
+~~~
+
+<pre>
+- raw unordered
+3. raw ordered
+</pre>
+"""
+
+    rendered = app_bundle.main.render_markdown(content)
+    root = ET.fromstring(f"<root>{rendered}</root>")
+    code_blocks = root.findall("./pre")
+
+    assert len(code_blocks) == 3
+    assert code_blocks[0].find("code").text == (
+        "1. fenced ordered\n- fenced unordered\n"
+    )
+    assert code_blocks[1].find("code").text == (
+        "- tilde unordered\n2. tilde ordered\n"
+    )
+    assert code_blocks[2].text == "\n- raw unordered\n3. raw ordered\n"
+    assert root.findall(".//ol") == []
+    assert root.findall(".//ul") == []
+
+
+def test_nested_mixed_list_dedent_keeps_parent_sibling(app_bundle):
+    content = """1. parent
+   - nested unordered
+   1. nested ordered marker
+2. parent sibling
+"""
+
+    rendered = app_bundle.main.render_markdown(content)
+    root = ET.fromstring(f"<root>{rendered}</root>")
+    outer_list = root.find("./ol")
+
+    assert outer_list is not None
+    assert len(outer_list.findall("./li")) == 2
+    assert "".join(outer_list[1].itertext()) == "parent sibling"
+    child_lists = [
+        child
+        for child in outer_list[0]
+        if child.tag in {"ol", "ul"}
+    ]
+    assert [child.tag for child in child_lists] == ["ul", "ol"]
+    assert "".join(child_lists[0].itertext()).strip() == "nested unordered"
+    assert "".join(child_lists[1].itertext()).strip() == "nested ordered marker"
+
+
+def test_mixed_lists_inside_blockquote_keep_marker_types(app_bundle):
+    root_mixed = """> 1. quoted ordered
+> - quoted unordered
+> 2. quoted ordered again
+"""
+
+    rendered = app_bundle.main.render_markdown(root_mixed)
+    root = ET.fromstring(f"<root>{rendered}</root>")
+    blockquote = root.find("./blockquote")
+
+    assert blockquote is not None
+    assert [child.tag for child in blockquote] == ["ol", "ul", "ol"]
+    assert blockquote[2].attrib == {"start": "2"}
+
+
+def test_list_preprocessor_preserves_root_indents_and_indented_code(app_bundle):
+    for indent in range(1, 4):
+        rendered = app_bundle.main.render_markdown(f"{' ' * indent}- root item")
+        root = ET.fromstring(f"<root>{rendered}</root>")
+
+        assert root.find("./ul/li").text == "root item"
+        assert root.find("./pre") is None
+
+    indented_code = """Paragraph
+
+    - four spaces
+     - five spaces
+      1. six spaces
+        - eight spaces
+"""
+    rendered = app_bundle.main.render_markdown(indented_code)
+    root = ET.fromstring(f"<root>{rendered}</root>")
+
+    assert root.find("./pre/code").text == (
+        "- four spaces\n"
+        " - five spaces\n"
+        "  1. six spaces\n"
+        "    - eight spaces\n"
+    )
+    assert root.findall(".//ul") == []
+    assert root.findall(".//ol") == []
 
 
 def test_markdown_html_and_dangerous_protocols_are_sanitized(app_bundle):
