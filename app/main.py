@@ -1,4 +1,6 @@
+import hashlib
 import html
+import json
 import logging
 import math
 import os
@@ -11,10 +13,10 @@ from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import markdown
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -211,7 +213,9 @@ def _apply_security_headers(response, request: Request) -> None:
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
         )
-    if request.url.path.startswith(("/admin", "/login", "/api/auth")):
+    if request.url.path.startswith(
+        ("/admin", "/login", "/api/auth", "/api/posts")
+    ):
         response.headers["Cache-Control"] = "no-store"
 
 
@@ -819,6 +823,16 @@ def _model_to_dict(obj):
     return result
 
 
+def _serialize_post_summary(post: dict) -> dict:
+    """将后台文章元数据转换为可安全写入模板的字典。"""
+    return {
+        key: value.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(value, datetime)
+        else value
+        for key, value in post.items()
+    }
+
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_page(
     request: Request,
@@ -835,7 +849,11 @@ def admin_page(
         bookmark_total = crud.count_bookmarks(db)
         post_page = _clamp_page(post_page, page_size, post_total)
         bookmark_page = _clamp_page(bookmark_page, page_size, bookmark_total)
-        posts = crud.get_posts(db, skip=(post_page - 1) * page_size, limit=page_size, published_only=False)
+        posts = crud.get_post_admin_summaries(
+            db,
+            skip=(post_page - 1) * page_size,
+            limit=page_size,
+        )
         nav_links = crud.get_nav_links(db)
         bookmarks = crud.get_bookmarks(db, skip=(bookmark_page - 1) * page_size, limit=page_size)
 
@@ -843,7 +861,7 @@ def admin_page(
         nav_categories = sorted(set(default_categories + [link.category for link in nav_links if link.category]))
         bookmark_tags = crud.get_all_bookmark_tags(db)
         return templates.TemplateResponse(request, "admin.html", {
-            "posts": [_model_to_dict(post) for post in posts],
+            "posts": [_serialize_post_summary(post) for post in posts],
             "nav_links": [_model_to_dict(link) for link in nav_links],
             "bookmarks": [_model_to_dict(bookmark) for bookmark in bookmarks],
             "redemption_codes": [],
@@ -867,6 +885,62 @@ def admin_page(
             is_admin=True,
             reference=reference,
         )
+
+
+def _post_editor_context(
+    db: Session,
+    *,
+    username: str,
+    post_id: Optional[int],
+) -> dict:
+    post_categories, post_tags = crud.get_post_editor_options(db)
+    return {
+        "username": username,
+        "is_admin": True,
+        "is_new": post_id is None,
+        "post_id": post_id,
+        "post_categories": post_categories,
+        "post_tags": post_tags,
+    }
+
+
+@app.get("/admin/posts/new", response_class=HTMLResponse)
+def new_post_editor_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[str] = Depends(auth.get_current_user_optional),
+):
+    if not current_user:
+        return RedirectResponse(
+            url=f"/login?next={quote(request.url.path, safe='/')}",
+            status_code=303,
+        )
+    return templates.TemplateResponse(
+        request,
+        "post_editor.html",
+        _post_editor_context(db, username=current_user, post_id=None),
+    )
+
+
+@app.get("/admin/posts/{post_id}/edit", response_class=HTMLResponse)
+def edit_post_editor_page(
+    request: Request,
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[str] = Depends(auth.get_current_user_optional),
+):
+    if not current_user:
+        return RedirectResponse(
+            url=f"/login?next={quote(request.url.path, safe='/')}",
+            status_code=303,
+        )
+    if not crud.post_exists(db, post_id):
+        raise HTTPException(status_code=404, detail="Post not found")
+    return templates.TemplateResponse(
+        request,
+        "post_editor.html",
+        _post_editor_context(db, username=current_user, post_id=post_id),
+    )
 
 
 @app.post("/api/auth/login")
@@ -920,15 +994,97 @@ async def api_logout(request: Request):
     return response
 
 
+_POST_ETAG_FIELDS = (
+    "title",
+    "slug",
+    "content",
+    "summary",
+    "category",
+    "tags",
+    "is_published",
+)
+_POST_CONFLICT_DETAIL = (
+    "Post was modified in another session. Reload the latest version before saving."
+)
+
+
+def _post_etag(post) -> str:
+    """基于全部可编辑字段生成稳定的强 ETag。"""
+    canonical = json.dumps(
+        {field: getattr(post, field) for field in _POST_ETAG_FIELDS},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f'"{hashlib.sha256(canonical).hexdigest()}"'
+
+
+def _if_match_satisfied(if_match: str, current_etag: str) -> bool:
+    """If-Match 使用强比较，同时兼容 RFC 定义的 * 与多标签列表。"""
+    candidates = {candidate.strip() for candidate in if_match.split(",")}
+    return "*" in candidates or current_etag in candidates
+
+
 @app.post("/api/posts", response_model=schemas.PostInDB, status_code=status.HTTP_201_CREATED)
-def create_post(post: schemas.PostCreate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+def create_post(
+    post: schemas.PostCreate,
+    response: Response,
+    db: Session = Depends(get_db),
+    _current_user: str = Depends(auth.get_current_user),
+):
     if crud.get_post_by_slug(db, post.slug):
         raise HTTPException(status_code=409, detail="Slug already exists")
-    return crud.create_post(db, post)
+    created = crud.create_post(db, post)
+    response.headers["ETag"] = _post_etag(created)
+    return created
+
+
+@app.get("/api/posts/{post_id}", response_model=schemas.PostInDB)
+def api_get_post(
+    post_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    _current_user: str = Depends(auth.get_current_user),
+):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    response.headers["ETag"] = _post_etag(post)
+    return post
 
 
 @app.put("/api/posts/{post_id}", response_model=schemas.PostInDB)
-def update_post(post_id: int, post_update: schemas.PostUpdate, db: Session = Depends(get_db), _current_user: str = Depends(auth.get_current_user)):
+def update_post(
+    post_id: int,
+    post_update: schemas.PostUpdate,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    _current_user: str = Depends(auth.get_current_user),
+):
+    # SQLite 需要在读取当前版本前锁定写事务，避免两个并发
+    # If-Match 请求同时通过检查后互相覆盖。
+    if engine.dialect.name == "sqlite":
+        db.execute(text("BEGIN IMMEDIATE"))
+
+    current = (
+        db.query(models.Post)
+        .filter(models.Post.id == post_id)
+        .with_for_update()
+        .first()
+    )
+    if not current:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    current_etag = _post_etag(current)
+    if_match = request.headers.get("if-match")
+    if if_match is not None and not _if_match_satisfied(if_match, current_etag):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_POST_CONFLICT_DETAIL,
+            headers={"ETag": current_etag},
+        )
+
     if post_update.slug:
         existing = crud.get_post_by_slug(db, post_update.slug)
         if existing and existing.id != post_id:
@@ -936,6 +1092,7 @@ def update_post(post_id: int, post_update: schemas.PostUpdate, db: Session = Dep
     updated = crud.update_post(db, post_id, post_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Post not found")
+    response.headers["ETag"] = _post_etag(updated)
     return updated
 
 

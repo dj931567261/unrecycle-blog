@@ -1,0 +1,1214 @@
+/* ==========================================================================
+   沉浸式文章编辑器
+
+   仅使用局部渐变和明确属性的过渡，避免长文编辑时触发 Safari
+   的大面积重绘。
+   ========================================================================== */
+
+.post-editor-body {
+    --pe-bg: #090b0f;
+    --pe-surface: #101319;
+    --pe-raised: #151922;
+    --pe-canvas: #0d1015;
+    --pe-canvas-muted: #0b0e13;
+    --pe-border: rgba(255, 255, 255, 0.09);
+    --pe-border-strong: rgba(255, 255, 255, 0.16);
+    --pe-hover: rgba(255, 255, 255, 0.07);
+    --pe-active: rgba(124, 108, 255, 0.16);
+    --pe-accent-soft: rgba(124, 108, 255, 0.12);
+    --pe-success-soft: rgba(16, 185, 129, 0.12);
+    --pe-warning-soft: rgba(245, 158, 11, 0.12);
+    --pe-error-soft: rgba(239, 68, 68, 0.12);
+    --pe-header-height: 68px;
+    --pe-mobile-actions-height: 72px;
+    --pe-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--pe-bg);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .post-editor-body {
+    --pe-bg: #eef1f5;
+    --pe-surface: #ffffff;
+    --pe-raised: #f8fafc;
+    --pe-canvas: #ffffff;
+    --pe-canvas-muted: #f7f8fa;
+    --pe-border: rgba(15, 23, 42, 0.1);
+    --pe-border-strong: rgba(15, 23, 42, 0.18);
+    --pe-hover: rgba(15, 23, 42, 0.06);
+    --pe-active: rgba(76, 62, 220, 0.1);
+    --pe-accent-soft: rgba(76, 62, 220, 0.09);
+    --pe-success-soft: rgba(5, 150, 105, 0.1);
+    --pe-warning-soft: rgba(217, 119, 6, 0.1);
+    --pe-error-soft: rgba(220, 38, 38, 0.09);
+    --pe-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+}
+
+.post-editor-body::before,
+.post-editor-body::after,
+.post-editor-body > .site-header,
+.post-editor-body > .site-footer {
+    display: none;
+}
+
+.post-editor-body > .site-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+}
+
+.post-editor-body > .site-main > .container {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.post-editor-shell {
+    position: relative;
+    isolation: isolate;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background:
+        linear-gradient(135deg, var(--pe-accent-soft), transparent 26%),
+        var(--pe-bg);
+}
+
+.post-editor-shell [hidden] {
+    display: none !important;
+}
+
+#post-editor-form {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.post-editor-header {
+    grid-row: 1;
+}
+
+.post-editor-restore-banner {
+    grid-row: 2;
+}
+
+.post-editor-form-error {
+    grid-row: 3;
+}
+
+.post-editor-main {
+    grid-row: 4;
+}
+
+/* 顶栏 */
+.post-editor-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    min-height: var(--pe-header-height);
+    border-bottom: 1px solid var(--pe-border);
+    background: var(--pe-surface);
+}
+
+.post-editor-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: var(--pe-header-height);
+    padding: 10px clamp(16px, 2.2vw, 32px);
+}
+
+.post-editor-header-start,
+.post-editor-document-meta,
+.post-editor-actions {
+    display: flex;
+    align-items: center;
+}
+
+.post-editor-header-start {
+    min-width: 0;
+    gap: 12px;
+}
+
+.post-editor-document-meta {
+    min-width: 0;
+    gap: 10px;
+}
+
+.post-editor-actions {
+    flex: 0 0 auto;
+    gap: 9px;
+    margin-left: auto;
+}
+
+.post-editor-back {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 11px;
+    border: 1px solid var(--pe-border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+    transition:
+        color var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease,
+        transform var(--duration-press) ease;
+}
+
+.post-editor-back:hover {
+    border-color: var(--pe-border-strong);
+    background: var(--pe-hover);
+    color: var(--text-primary);
+}
+
+.post-editor-back:active {
+    transform: scale(0.96);
+}
+
+#editor-document-label {
+    max-width: 210px;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.09em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.post-editor-save-state,
+.post-editor-upload-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.post-editor-save-state > span,
+.post-editor-upload-status::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.post-editor-save-state > strong {
+    overflow: hidden;
+    font-size: inherit;
+    font-weight: 550;
+    text-overflow: ellipsis;
+}
+
+.post-editor-save-state[data-state="dirty"] {
+    color: var(--warning);
+}
+
+.post-editor-save-state[data-state="saving"],
+.post-editor-upload-status[data-state="active"],
+.post-editor-upload-status[data-state="uploading"] {
+    color: var(--accent-blue);
+}
+
+.post-editor-save-state[data-state="saved"],
+.post-editor-upload-status[data-state="success"] {
+    color: var(--success);
+}
+
+.post-editor-save-state[data-state="error"],
+.post-editor-save-state[data-state="offline"],
+.post-editor-upload-status[data-state="error"] {
+    color: var(--error);
+}
+
+.post-editor-upload-status[data-state="idle"]::before {
+    display: none;
+}
+
+.post-editor-save-state[data-state="saving"] > span,
+.post-editor-upload-status[data-state="active"]::before,
+.post-editor-upload-status[data-state="uploading"]::before {
+    animation: pe-status-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pe-status-pulse {
+    0%, 100% {
+        opacity: 0.45;
+        transform: scale(0.82);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.post-editor-header .btn {
+    min-height: 40px;
+    padding: 9px 15px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.post-editor-save-draft {
+    border: 1px solid var(--pe-border-strong);
+    background: transparent;
+}
+
+.post-editor-publish {
+    min-width: 112px;
+}
+
+.post-editor-publish[data-action="unpublish"] {
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    background: var(--pe-warning-soft);
+    color: var(--warning);
+    box-shadow: none;
+}
+
+.post-editor-settings-trigger[aria-expanded="true"] {
+    border-color: rgba(124, 108, 255, 0.34);
+    background: var(--pe-active);
+}
+
+/* 视图切换 */
+.post-editor-mode-switch,
+.post-editor-mobile-tabs {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--pe-border);
+    border-radius: 9px;
+    background: var(--pe-canvas-muted);
+}
+
+.post-editor-mode-switch [data-editor-mode],
+.post-editor-mobile-tabs [data-mobile-panel] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
+}
+
+.post-editor-mode-switch [data-editor-mode]:hover,
+.post-editor-mobile-tabs [data-mobile-panel]:hover {
+    color: var(--text-primary);
+}
+
+.post-editor-mode-switch [aria-pressed="true"],
+.post-editor-mobile-tabs [aria-selected="true"] {
+    background: var(--pe-raised);
+    color: var(--text-primary);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+
+.post-editor-mobile-tabs {
+    display: none;
+}
+
+/* 恢复与表单错误 */
+.post-editor-restore-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 12px clamp(14px, 2vw, 24px) 0;
+    padding: 11px 14px;
+    border: 1px solid rgba(245, 158, 11, 0.24);
+    border-radius: 10px;
+    background: var(--pe-warning-soft);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.post-editor-restore-banner > div,
+.post-editor-restore-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.post-editor-restore-banner i {
+    color: var(--warning);
+}
+
+.post-editor-restore-actions {
+    flex: 0 0 auto;
+}
+
+.post-editor-restore-actions .btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+}
+
+.post-editor-form-error {
+    margin: 10px clamp(14px, 2vw, 24px) 0;
+}
+
+.post-editor-field-error,
+[data-error-for] {
+    color: var(--error);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+[data-error-for="form"]:not(:empty) {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgba(239, 68, 68, 0.24);
+    border-radius: 9px;
+    background: var(--pe-error-soft);
+}
+
+/* 主编辑区 */
+.post-editor-main {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    gap: 12px;
+    width: min(100%, 1760px);
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0 auto;
+    padding: clamp(14px, 2vw, 24px);
+    overflow: hidden;
+}
+
+.post-editor-title-wrap {
+    grid-row: 1;
+    min-width: 0;
+}
+
+.post-editor-toolbar {
+    grid-row: 2;
+}
+
+.post-editor-mobile-tabs {
+    grid-row: 3;
+}
+
+.post-editor-workspace {
+    grid-row: 4;
+}
+
+.post-editor-stats {
+    grid-row: 5;
+}
+
+.post-editor-title-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 54px;
+    padding: 2px 0 4px;
+    overflow: hidden;
+    resize: none;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    border-radius: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    font-size: clamp(28px, 3vw, 46px);
+    font-weight: 680;
+    letter-spacing: -0.045em;
+    line-height: 1.14;
+    transition: border-color var(--duration-fast) ease;
+}
+
+.post-editor-title-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.72;
+}
+
+.post-editor-title-input:hover {
+    border-bottom-color: var(--pe-border);
+}
+
+.post-editor-title-input:focus {
+    border-bottom-color: var(--accent-blue);
+}
+
+/* Markdown 工具栏 */
+.post-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 48px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border: 1px solid var(--pe-border);
+    border-radius: 12px;
+    background: var(--pe-surface);
+    scrollbar-width: none;
+}
+
+.post-editor-toolbar::-webkit-scrollbar {
+    display: none;
+}
+
+.post-editor-tool {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        color var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease,
+        transform var(--duration-press) ease;
+}
+
+.post-editor-tool:hover {
+    border-color: var(--pe-border);
+    background: var(--pe-hover);
+    color: var(--text-primary);
+}
+
+.post-editor-tool:active {
+    transform: scale(0.95);
+}
+
+.post-editor-tool-separator {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 22px;
+    margin: 0 3px;
+    background: var(--pe-border);
+}
+
+.post-editor-upload-status {
+    max-width: min(38vw, 440px);
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 写作 / 预览工作台 */
+.post-editor-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--pe-border);
+    border-radius: 14px;
+    background: var(--pe-surface);
+    box-shadow: var(--pe-shadow);
+}
+
+.post-editor-pane {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--pe-canvas);
+}
+
+.post-editor-write-pane {
+    border-right: 1px solid var(--pe-border);
+}
+
+.post-editor-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--pe-border);
+    background: var(--pe-raised);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.post-editor-pane-header span:last-child {
+    overflow: hidden;
+    letter-spacing: 0;
+    text-overflow: ellipsis;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.post-editor-textarea {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: clamp(20px, 2.6vw, 38px);
+    overflow: auto;
+    resize: none;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    background: var(--pe-canvas-muted);
+    color: var(--text-primary);
+    caret-color: var(--accent-purple);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-ligatures: none;
+    line-height: 1.78;
+    tab-size: 4;
+    transition:
+        color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
+}
+
+.post-editor-textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.82;
+}
+
+.post-editor-textarea:focus {
+    background: var(--pe-canvas);
+}
+
+.post-editor-textarea.is-dragging {
+    background: var(--pe-accent-soft);
+    box-shadow: inset 0 0 0 2px var(--accent-blue);
+}
+
+.post-editor-preview {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: clamp(22px, 3vw, 50px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    background: var(--pe-canvas);
+    color: var(--text-primary);
+    font-size: 16px;
+    line-height: 1.82;
+}
+
+.post-editor-preview > :first-child {
+    margin-top: 0;
+}
+
+.post-editor-preview > :last-child {
+    margin-bottom: 0;
+}
+
+.post-editor-preview-empty {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    min-height: 220px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.post-editor-workspace[data-mode="write"],
+.post-editor-workspace[data-mode="preview"] {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.post-editor-workspace[data-mode="write"] .post-editor-write-pane {
+    border-right: 0;
+}
+
+.post-editor-workspace[data-mode="write"] .post-editor-preview-pane,
+.post-editor-workspace[data-mode="preview"] .post-editor-write-pane {
+    display: none;
+}
+
+.post-editor-workspace[data-mode="preview"] .post-editor-preview {
+    width: min(100%, 980px);
+    margin: 0 auto;
+}
+
+.post-editor-stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 24px;
+    padding: 0 3px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+#editor-word-count {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+/* 设置抽屉 */
+.post-editor-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    visibility: hidden;
+    padding: 0;
+    border: 0;
+    background: rgba(3, 5, 8, 0.56);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity var(--duration-fast) var(--ease-exit),
+        visibility var(--duration-fast) linear;
+}
+
+.post-editor-drawer-backdrop.is-open {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transition-timing-function: var(--ease-enter), linear;
+}
+
+.post-editor-settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 70;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    width: min(410px, calc(100vw - 24px));
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    visibility: hidden;
+    border-left: 1px solid var(--pe-border-strong);
+    background: var(--pe-surface);
+    box-shadow: -24px 0 64px rgba(0, 0, 0, 0.28);
+    transform: translate3d(102%, 0, 0);
+    pointer-events: none;
+    will-change: transform;
+    transition:
+        transform var(--duration-normal) var(--ease-exit),
+        visibility var(--duration-normal) linear;
+}
+
+.post-editor-settings-drawer.is-open {
+    visibility: visible;
+    transform: translate3d(0, 0, 0);
+    pointer-events: auto;
+    transition-timing-function: var(--ease-enter), linear;
+}
+
+.post-editor-settings-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--pe-header-height);
+    padding: 17px 20px;
+    border-bottom: 1px solid var(--pe-border);
+}
+
+.post-editor-settings-header h2 {
+    color: var(--text-primary);
+    font-size: 18px;
+    line-height: 1.3;
+}
+
+.post-editor-settings-header .modal-close {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--pe-border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-secondary);
+    transition:
+        color var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease;
+}
+
+.post-editor-settings-header .modal-close:hover {
+    border-color: var(--pe-border-strong);
+    background: var(--pe-hover);
+    color: var(--text-primary);
+}
+
+.post-editor-settings-grid {
+    display: grid;
+    gap: 19px;
+    min-height: 0;
+    padding: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.post-editor-field {
+    display: grid;
+    gap: 7px;
+}
+
+.post-editor-field label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.post-editor-field-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.post-editor-field-heading > span,
+.post-editor-field > small {
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.post-editor-field-heading > button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-purple);
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--duration-fast) ease;
+}
+
+.post-editor-field-heading > button:hover {
+    color: var(--text-primary);
+}
+
+.post-editor-field .form-control {
+    width: 100%;
+    border: 1px solid var(--pe-border);
+    border-radius: 10px;
+    background: var(--pe-canvas-muted);
+    color: var(--text-primary);
+    transition:
+        border-color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
+}
+
+.post-editor-field .form-control:focus {
+    border-color: var(--accent-blue);
+    background: var(--pe-canvas);
+    box-shadow: 0 0 0 3px var(--pe-accent-soft);
+}
+
+.post-editor-field textarea {
+    min-height: 108px;
+    resize: vertical;
+}
+
+.post-editor-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.post-editor-suggestions button {
+    padding: 5px 8px;
+    border: 1px solid var(--pe-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: pointer;
+    transition:
+        color var(--duration-fast) ease,
+        border-color var(--duration-fast) ease,
+        background-color var(--duration-fast) ease;
+}
+
+.post-editor-suggestions button:hover {
+    border-color: rgba(124, 108, 255, 0.32);
+    background: var(--pe-accent-soft);
+    color: var(--accent-purple);
+}
+
+.post-editor-publication-card {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--pe-border);
+    border-radius: 11px;
+    background: var(--pe-canvas-muted);
+}
+
+.post-editor-publication-card > span {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.post-editor-publication-card > strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--warning);
+    font-size: 13px;
+}
+
+.post-editor-publication-card > strong[data-published="true"] {
+    color: var(--success);
+}
+
+.post-editor-publication-card > p {
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.post-editor-settings-open {
+    overflow: hidden;
+}
+
+.post-editor-mobile-actions {
+    display: none;
+}
+
+/* 中等屏幕 */
+@media (max-width: 1100px) {
+    #editor-document-label {
+        max-width: 130px;
+    }
+
+    .post-editor-header .btn {
+        padding-right: 11px;
+        padding-left: 11px;
+    }
+
+    .post-editor-textarea,
+    .post-editor-preview {
+        padding: 24px;
+    }
+}
+
+@media (max-width: 860px) {
+    .post-editor-body {
+        --pe-header-height: 60px;
+    }
+
+    .post-editor-header-inner {
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    #editor-document-label,
+    #editor-view-link,
+    .post-editor-mode-switch {
+        display: none !important;
+    }
+
+    .post-editor-save-state {
+        max-width: 116px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .post-editor-main {
+        padding: 12px;
+    }
+
+    .post-editor-title-input {
+        font-size: clamp(26px, 6vw, 36px);
+    }
+
+    .post-editor-mobile-tabs {
+        display: inline-flex;
+        width: 100%;
+    }
+
+    .post-editor-mobile-tabs [data-mobile-panel] {
+        flex: 1 1 0;
+    }
+
+    .post-editor-workspace[data-mode="split"] {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .post-editor-workspace[data-mode="split"] .post-editor-write-pane {
+        border-right: 0;
+    }
+
+    .post-editor-workspace[data-mode="split"] .post-editor-preview-pane {
+        display: none;
+    }
+}
+
+/* 手机 */
+@media (max-width: 640px) {
+    .post-editor-body {
+        --pe-mobile-actions-height: calc(68px + env(safe-area-inset-bottom));
+    }
+
+    .post-editor-shell {
+        background: var(--pe-bg);
+    }
+
+    .post-editor-header {
+        padding-top: env(safe-area-inset-top);
+    }
+
+    .post-editor-header-inner {
+        min-height: 56px;
+    }
+
+    .post-editor-back {
+        width: 38px;
+        min-width: 38px;
+        height: 38px;
+        padding: 0;
+    }
+
+    .post-editor-back span {
+        display: none;
+    }
+
+    .post-editor-header .post-editor-save-draft,
+    .post-editor-header .post-editor-publish {
+        display: none;
+    }
+
+    .post-editor-settings-trigger {
+        min-width: 38px;
+        height: 38px;
+        padding: 0 10px !important;
+    }
+
+    .post-editor-save-state {
+        max-width: 104px;
+        font-size: 10px;
+    }
+
+    .post-editor-main {
+        gap: 8px;
+        padding: 10px 10px var(--pe-mobile-actions-height);
+    }
+
+    .post-editor-restore-banner {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 9px;
+        margin: 8px 10px 0;
+    }
+
+    .post-editor-restore-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .post-editor-form-error {
+        margin: 8px 10px 0;
+    }
+
+    .post-editor-title-input {
+        min-height: 42px;
+        padding-bottom: 5px;
+        font-size: 27px;
+        letter-spacing: -0.035em;
+    }
+
+    .post-editor-toolbar {
+        min-height: 44px;
+        padding: 5px;
+        border-radius: 10px;
+    }
+
+    .post-editor-tool {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+    }
+
+    .post-editor-tool-separator {
+        height: 19px;
+    }
+
+    .post-editor-upload-status {
+        max-width: 180px;
+        font-size: 10px;
+    }
+
+    .post-editor-workspace {
+        border-radius: 10px;
+        box-shadow: none;
+    }
+
+    .post-editor-pane-header {
+        min-height: 38px;
+        padding: 6px 11px;
+    }
+
+    .post-editor-textarea,
+    .post-editor-preview {
+        padding: 18px 16px;
+        font-size: 14px;
+        line-height: 1.72;
+    }
+
+    .post-editor-preview.markdown-body {
+        font-size: 15px;
+    }
+
+    .post-editor-stats {
+        min-height: 20px;
+        font-size: 9px;
+    }
+
+    #editor-local-status {
+        display: none;
+    }
+
+    .post-editor-mobile-actions {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 45;
+        display: grid;
+        grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+        gap: 9px;
+        min-height: var(--pe-mobile-actions-height);
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--pe-border-strong);
+        background: var(--pe-surface);
+    }
+
+    .post-editor-mobile-actions .btn {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .post-editor-settings-drawer {
+        top: auto;
+        bottom: 0;
+        width: 100%;
+        max-height: calc(100dvh - env(safe-area-inset-top));
+        border-top: 1px solid var(--pe-border-strong);
+        border-left: 0;
+        border-radius: 16px 16px 0 0;
+        transform: translate3d(0, 102%, 0);
+    }
+
+    .post-editor-settings-drawer.is-open {
+        transform: translate3d(0, 0, 0);
+    }
+
+    .post-editor-settings-header {
+        min-height: 62px;
+        padding: 14px 16px;
+    }
+
+    .post-editor-settings-grid {
+        padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+}
+
+@media (max-width: 390px) {
+    .post-editor-save-state {
+        max-width: 74px;
+    }
+
+    .post-editor-settings-trigger {
+        width: 38px;
+        padding: 0 !important;
+        overflow: hidden;
+        color: transparent;
+        font-size: 0;
+    }
+
+    .post-editor-settings-trigger i {
+        color: var(--text-primary);
+        font-size: 14px;
+    }
+
+    .post-editor-title-input {
+        font-size: 24px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .post-editor-back,
+    .post-editor-title-input,
+    .post-editor-tool,
+    .post-editor-mode-switch [data-editor-mode],
+    .post-editor-mobile-tabs [data-mobile-panel],
+    .post-editor-textarea,
+    .post-editor-drawer-backdrop,
+    .post-editor-settings-drawer,
+    .post-editor-settings-header .modal-close,
+    .post-editor-field .form-control,
+    .post-editor-field-heading > button,
+    .post-editor-suggestions button {
+        transition-duration: 0.01ms;
+    }
+
+    .post-editor-save-state[data-state="saving"] > span,
+    .post-editor-upload-status[data-state="active"]::before,
+    .post-editor-upload-status[data-state="uploading"]::before {
+        animation: none;
+    }
+}

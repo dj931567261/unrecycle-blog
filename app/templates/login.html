@@ -76,6 +76,18 @@
     const loginSubmitBtn = document.getElementById('login-submit-btn');
 
     const query = new URLSearchParams(window.location.search);
+    const requestedNext = query.get('next');
+    let safeNext = '/admin';
+    if (requestedNext) {
+        try {
+            const parsedNext = new URL(requestedNext, window.location.origin);
+            if (parsedNext.origin === window.location.origin) {
+                safeNext = `${parsedNext.pathname}${parsedNext.search}${parsedNext.hash}`;
+            }
+        } catch (error) {
+            safeNext = '/admin';
+        }
+    }
     if (query.get('expired') === '1') {
         loginError.textContent = '登录状态已过期，请重新登录后继续操作。';
         loginError.style.display = 'block';
@@ -106,7 +118,7 @@
             if (response.ok) {
                 // Success! Token is saved in HttpOnly cookie automatically by backend,
                 // and the API returned success. Redirect to admin dashboard.
-                window.location.href = '/admin';
+                window.location.href = safeNext;
             } else {
                 loginError.textContent = `❌ 登录失败: ${data.detail || '用户名或密码不正确'}`;
                 loginError.style.display = 'block';

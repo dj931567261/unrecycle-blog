@@ -6,10 +6,18 @@
 
 {% block content %}
 <div class="blog-detail-container blog-article-page">
-    <a href="/blog" class="blog-back-link" data-reveal>
-        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-        <span>返回文章列表</span>
-    </a>
+    <div class="blog-article-toolbar" data-reveal>
+        <a href="/blog" class="blog-back-link">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回文章列表</span>
+        </a>
+        {% if is_admin %}
+            <a href="/admin/posts/{{ post.id }}/edit" class="btn btn-secondary blog-admin-edit-link">
+                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                编辑本文
+            </a>
+        {% endif %}
+    </div>
 
     <article class="blog-article" aria-labelledby="article-title">
         <header class="blog-detail-header blog-article-header" data-reveal data-reveal-delay="1">

@@ -66,9 +66,11 @@
 
         <!-- TAB 1: POSTS -->
         <div id="posts-tab" class="admin-tab-content active" role="tabpanel"
-             aria-labelledby="posts-tab-button">
+            aria-labelledby="posts-tab-button">
             <div class="action-row">
-                <button class="btn btn-primary" onclick="openPostModal()"><i class="fa-solid fa-plus"></i> 新建技术文章</button>
+                <a class="btn btn-primary" href="/admin/posts/new">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> 新建技术文章
+                </a>
             </div>
             <div style="overflow-x: auto;">
                 <table class="admin-table">
@@ -98,10 +100,10 @@
                                         {% endif %}
                                     </td>
                                     <td style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
-                                        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;" 
-                                                onclick="editPost({{ post|tojson|forceescape }})">
+                                        <a class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                           href="/admin/posts/{{ post.id }}/edit">
                                             <i class="fa-solid fa-pen-to-square"></i> 编辑
-                                        </button>
+                                        </a>
                                         <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;" 
                                                 onclick="deletePost({{ post.id }})">
                                             <i class="fa-solid fa-trash"></i> 删除
@@ -253,84 +255,6 @@
     </section>
     </div>
 
-    <!-- MODAL 1: POST (CREATE/EDIT) -->
-    <div id="post-modal" class="modal-backdrop" role="dialog" aria-modal="true"
-         aria-labelledby="post-modal-title" aria-hidden="true">
-        <div class="glass-card admin-modal" style="width: 85vw; max-width: 1000px; padding: 24px;">
-            <div class="modal-header">
-                <h3 id="post-modal-title">撰写技术博文</h3>
-                <button class="modal-close" type="button" aria-label="关闭文章编辑弹窗"
-                        onclick="closePostModal()">&times;</button>
-            </div>
-            <form id="post-form">
-                <input type="hidden" id="post-id">
-                
-                <div class="admin-post-meta-grid">
-                    <!-- Left: content and meta -->
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label for="post-title">文章标题</label>
-                            <input type="text" id="post-title" required class="form-control" placeholder="输入文章标题..." oninput="autoGenerateSlug()">
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label for="post-slug">URL 别名 (Slug)</label>
-                            <input type="text" id="post-slug" required class="form-control" placeholder="my-first-post">
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label for="post-summary">文章摘要 / 导语</label>
-                            <textarea id="post-summary" class="form-control" rows="2" placeholder="简要描述这篇文章的内容..."></textarea>
-                        </div>
-                    </div>
-                    
-                    <!-- Right: attributes -->
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label for="post-category">文章分类</label>
-                            <input type="text" id="post-category" class="form-control" placeholder="日常记录" default="Tech">
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label for="post-tags">标签 (英文逗号分隔)</label>
-                            <input type="text" id="post-tags" class="form-control" placeholder="Python,FastAPI,SQLite">
-                        </div>
-                        
-                        <div class="form-group" style="margin-bottom:0; display: flex; align-items: center; gap: 10px; height: 100%; padding-top: 24px;">
-                            <input type="checkbox" id="post-published" checked style="width:18px; height:18px; cursor:pointer;">
-                            <label for="post-published" style="margin-bottom:0; cursor:pointer;">立即发布 (不勾选为草稿)</label>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Markdown Editor with split preview -->
-                <div class="form-group" style="margin-top: 16px; margin-bottom: 20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                        <label style="margin-bottom:0; display:flex; align-items:center; gap:10px;">
-                            Markdown 内容正文
-                            <button type="button" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; line-height:1; display:flex; align-items:center; gap:4px;" onclick="document.getElementById('image-upload-input').click()">
-                                <i class="fa-solid fa-image"></i> 上传图片
-                            </button>
-                            <input type="file" id="image-upload-input" style="display:none;" accept="image/*" onchange="handleImageUploadSelect(this)">
-                        </label>
-                        <span id="image-upload-status" class="image-upload-status" role="status">点击按钮、拖拽或粘贴图片均可上传</span>
-                    </div>
-                    <div class="md-editor-split">
-                        <textarea id="post-content" required class="md-editor-input" placeholder="支持标准 Markdown 语法..." oninput="updateEditorPreview()"></textarea>
-                        <div id="post-preview" class="md-editor-preview markdown-body">
-                            <span style="color: var(--text-muted); font-style: italic;">实时预览区域...</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="display: flex; justify-content: flex-end; gap: 12px;">
-                    <button type="button" class="btn btn-secondary" onclick="closePostModal()">取消</button>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> 保存文章</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- MODAL 2: NAV LINK -->
     <div id="nav-modal" class="modal-backdrop" role="dialog" aria-modal="true"
          aria-labelledby="nav-modal-title" aria-hidden="true">
@@ -428,8 +352,6 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Marked library CDN for live markdown preview in editor (Local) -->
-<script src="/static/js/marked.min.js"></script>
 <script>
     // Tab switching logic
     function switchTab(tabId, btn) {
@@ -511,7 +433,8 @@
     }
 
     function redirectToLogin() {
-        window.location.href = '/login?expired=1';
+        const next = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.href = `/login?expired=1&next=${encodeURIComponent(next)}`;
     }
 
     async function adminFetch(url, options = {}) {
@@ -539,7 +462,7 @@
         }
     }
 
-    const adminModals = document.querySelectorAll('#post-modal, #nav-modal, #bookmark-modal');
+    const adminModals = document.querySelectorAll('#nav-modal, #bookmark-modal');
     adminModals.forEach(modal => {
         modal.addEventListener('click', event => {
             if (event.target === modal && !modal.querySelector('button[type="submit"]:disabled')) {
@@ -567,373 +490,24 @@
 
     window.addEventListener('keydown', event => {
         if (event.key !== 'Escape') return;
-        const openModal = document.querySelector('#post-modal.open, #nav-modal.open, #bookmark-modal.open');
+        const openModal = document.querySelector('#nav-modal.open, #bookmark-modal.open');
         if (openModal && !openModal.querySelector('button[type="submit"]:disabled')) {
             hideModal(openModal.id);
         }
     });
 
     // --- BLOG POST MANAGEMENT ---
-    const postModal = document.getElementById('post-modal');
-    const postForm = document.getElementById('post-form');
-    const postTitle = document.getElementById('post-title');
-    const postSlug = document.getElementById('post-slug');
-    const postSummary = document.getElementById('post-summary');
-    const postCategory = document.getElementById('post-category');
-    const postTags = document.getElementById('post-tags');
-    const postPublished = document.getElementById('post-published');
-    const postContent = document.getElementById('post-content');
-    const postPreview = document.getElementById('post-preview');
-    const postIdInput = document.getElementById('post-id');
-    const imageUploadStatus = document.getElementById('image-upload-status');
-
-    function setImageUploadStatus(message, state = 'idle') {
-        imageUploadStatus.textContent = message;
-        imageUploadStatus.dataset.state = state;
-    }
-
-    function openPostModal() {
-        document.getElementById('post-modal-title').textContent = '撰写技术博文';
-        postForm.reset();
-        postIdInput.value = '';
-        postPreview.innerHTML = '<span class="text-muted" style="font-style: italic;">实时预览区域...</span>';
-        setImageUploadStatus('点击按钮、拖拽或粘贴图片均可上传');
-        showModal('post-modal');
-    }
-    function closePostModal() {
-        hideModal('post-modal');
-    }
-
-    // Slug Auto Generator
-    function autoGenerateSlug() {
-        if (postIdInput.value) return; // Don't overwrite slug when editing existing posts
-        const title = postTitle.value;
-        const slug = title.toLowerCase()
-            .replace(/[^\w\u4e00-\u9fa5\s-]/g, '') // Keep words, dashes, spaces and Chinese characters
-            .replace(/\s+/g, '-')                  // Replace spaces with dashes
-            .replace(/-+/g, '-');                  // Collapse consecutive dashes
-        postSlug.value = slug;
-    }
-
-    // Preprocess markdown to align with backend behavior:
-    // 1. Normalize 2-space or 3-space list indentation to 4-space multiples
-    // 2. Ensure blank line before lists that follow paragraph text
-    function preprocessMarkdown(text) {
-        if (!text) return "";
-        const lines = text.split(/\r?\n/);
-        const newLines = [];
-        const listItemPattern = /^\s*([-*+]|\d+\.)\s+/;
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            let processedLine = line;
-            
-            // Normalize nested list indentation
-            const indentMatch = line.match(/^(\s*)([-*+]|\d+\.)(\s+)(.*)/);
-            if (indentMatch) {
-                const spaces = indentMatch[1];
-                const bullet = indentMatch[2];
-                const postSpaces = indentMatch[3];
-                const content = indentMatch[4];
-                const numSpaces = spaces.length;
-                if (numSpaces > 0) {
-                    let newNumSpaces = Math.floor((numSpaces + 2) / 4) * 4;
-                    if (newNumSpaces === 0) {
-                        newNumSpaces = 4;
-                    }
-                    processedLine = " ".repeat(newNumSpaces) + bullet + postSpaces + content;
-                }
-            }
-            
-            // Insert blank line if current line is a list item and previous line is non-empty/non-list
-            if (i > 0) {
-                const prevLine = lines[i - 1].trim();
-                if (listItemPattern.test(processedLine) && prevLine) {
-                    // Check that prevLine is not already a list item or other common block markers
-                    if (!listItemPattern.test(prevLine) && 
-                        !prevLine.startsWith('#') && 
-                        !prevLine.startsWith('>') && 
-                        !prevLine.startsWith('`') && 
-                        !prevLine.startsWith('- ') && 
-                        !prevLine.startsWith('* ') && 
-                        !prevLine.startsWith('+ ')) {
-                        newLines.push("");
-                    }
-                }
-            }
-            
-            newLines.push(processedLine);
-        }
-        return newLines.join("\n");
-    }
-
-    function escapeRawHtml(markdownText) {
-        return markdownText
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-    }
-
-    function isSafePreviewUrl(rawUrl, allowImageData = false) {
-        const value = String(rawUrl || '').trim();
-        if (!value) return false;
-        if (value.startsWith('#') || value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) {
-            return true;
-        }
-        if (allowImageData && /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(value)) {
-            return true;
-        }
-        try {
-            const parsed = new URL(value, window.location.origin);
-            return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol);
-        } catch (error) {
-            return false;
-        }
-    }
-
-    function buildSafeMarkdownPreview(markdownText) {
-        const template = document.createElement('template');
-        const escapedMarkdown = escapeRawHtml(preprocessMarkdown(markdownText));
-        template.innerHTML = marked.parse(escapedMarkdown);
-
-        template.content.querySelectorAll('*').forEach(element => {
-            Array.from(element.attributes).forEach(attribute => {
-                if (attribute.name.toLowerCase().startsWith('on') || attribute.name.toLowerCase() === 'style') {
-                    element.removeAttribute(attribute.name);
-                }
-            });
-
-            if (element.tagName === 'A') {
-                const href = element.getAttribute('href');
-                if (!isSafePreviewUrl(href)) {
-                    element.removeAttribute('href');
-                    element.setAttribute('title', '已阻止不安全链接');
-                } else if (/^https?:/i.test(href || '')) {
-                    element.setAttribute('target', '_blank');
-                    element.setAttribute('rel', 'noopener noreferrer');
-                }
-            }
-
-            if (element.tagName === 'IMG' && !isSafePreviewUrl(element.getAttribute('src'), true)) {
-                element.removeAttribute('src');
-                element.setAttribute('alt', '已阻止不安全图片地址');
-            }
-        });
-        return template.content;
-    }
-
-    // Realtime Markdown Preview
-    function updateEditorPreview() {
-        const rawContent = postContent.value;
-        if (rawContent && window.marked) {
-            postPreview.replaceChildren(buildSafeMarkdownPreview(rawContent));
-        } else {
-            const placeholder = document.createElement('span');
-            placeholder.className = 'text-muted';
-            placeholder.textContent = '实时预览区域...';
-            postPreview.replaceChildren(placeholder);
-        }
-    }
-
-    // Drag-and-Drop Image Uploader logic in Markdown Editor textarea
-    postContent.addEventListener('paste', handleImagePaste);
-    postContent.addEventListener('drop', handleImageDrop);
-    postContent.addEventListener('dragover', event => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-        postContent.classList.add('upload-drop-active');
-        setImageUploadStatus('松开鼠标以上传图片', 'active');
-    });
-    postContent.addEventListener('dragleave', () => {
-        postContent.classList.remove('upload-drop-active');
-        setImageUploadStatus('点击按钮、拖拽或粘贴图片均可上传');
-    });
-
-    function insertUploadPlaceholder(label = '图片描述') {
-        const token = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const placeholder = `![上传中...](Uploading-${token})`;
-        const pos = postContent.selectionStart;
-        const text = postContent.value;
-        postContent.value = `${text.slice(0, pos)}\n${placeholder}\n${text.slice(pos)}`;
-        return { token, placeholder, label };
-    }
-
-    function finishUploadPlaceholder(upload, url, fallbackLabel = '图片描述') {
-        const replacement = url
-            ? `![${upload.label || fallbackLabel}](${url})`
-            : '![上传失败]()';
-        postContent.value = postContent.value.replace(upload.placeholder, replacement);
-        updateEditorPreview();
-    }
-
-    async function handleImageUploadSelect(input) {
-        const file = input.files?.[0];
-        if (!file) return;
-        
-        const upload = insertUploadPlaceholder(file.name || '图片描述');
-        setImageUploadStatus(`正在上传 ${file.name || '图片'}...`, 'active');
-        try {
-            const url = await uploadImageFile(file);
-            finishUploadPlaceholder(upload, url);
-            setImageUploadStatus(`已上传 ${file.name || '图片'}`, 'success');
-        } catch (error) {
-            finishUploadPlaceholder(upload, null);
-            if (error.message !== 'AUTH_EXPIRED') {
-                setImageUploadStatus(error.message || '图片上传失败', 'error');
-            }
-        } finally {
-            input.value = '';
-        }
-    }
-
-    async function uploadImageFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            const response = await adminFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            if (response.ok) {
-                const data = await response.json();
-                return data.url; // Retuns file path /static/uploads/uuid.png
-            }
-            let detail = '图片上传失败';
-            try {
-                const data = await response.json();
-                detail = data.detail || detail;
-            } catch (error) {
-                // Ignore non-JSON error bodies.
-            }
-            throw new Error(detail);
-        } catch (err) {
-            console.error("Image upload failed:", err);
-            throw err;
-        }
-    }
-
-    async function handleImagePaste(e) {
-        const items = e.clipboardData?.items;
-        if (!items) return;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                e.preventDefault();
-                const file = items[i].getAsFile();
-                
-                const upload = insertUploadPlaceholder('图片描述');
-                setImageUploadStatus('正在上传粘贴的图片...', 'active');
-                try {
-                    const url = await uploadImageFile(file);
-                    finishUploadPlaceholder(upload, url);
-                    setImageUploadStatus('粘贴图片上传成功', 'success');
-                } catch (error) {
-                    finishUploadPlaceholder(upload, null);
-                    if (error.message !== 'AUTH_EXPIRED') {
-                        setImageUploadStatus(error.message || '粘贴图片上传失败', 'error');
-                    }
-                }
-            }
-        }
-    }
-
-    async function handleImageDrop(e) {
-        e.preventDefault();
-        postContent.classList.remove('upload-drop-active');
-        const files = e.dataTransfer?.files;
-        if (!files || files.length === 0) {
-            setImageUploadStatus('未检测到可上传文件', 'error');
-            return;
-        }
-        
-        for (let i = 0; i < files.length; i++) {
-            if (files[i].type.indexOf('image') !== -1) {
-                const file = files[i];
-                const upload = insertUploadPlaceholder(file.name || '图片描述');
-                setImageUploadStatus(`正在上传 ${file.name || '图片'}...`, 'active');
-                try {
-                    const url = await uploadImageFile(file);
-                    finishUploadPlaceholder(upload, url);
-                    setImageUploadStatus(`已上传 ${file.name || '图片'}`, 'success');
-                } catch (error) {
-                    finishUploadPlaceholder(upload, null);
-                    if (error.message !== 'AUTH_EXPIRED') {
-                        setImageUploadStatus(error.message || '拖拽图片上传失败', 'error');
-                    }
-                }
-            }
-        }
-    }
-
-    // Submit Article form
-    postForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (postForm.dataset.submitting === 'true') return;
-        postForm.dataset.submitting = 'true';
-        setFormSubmitting(postForm, true, '保存文章中...');
-        
-        const payload = {
-            title: postTitle.value.trim(),
-            slug: postSlug.value.trim(),
-            summary: postSummary.value.trim(),
-            category: postCategory.value.trim() || 'Tech',
-            tags: postTags.value.trim(),
-            content: postContent.value,
-            is_published: postPublished.checked
-        };
-        
-        const id = postIdInput.value;
-        const url = id ? `/api/posts/${id}` : '/api/posts';
-        const method = id ? 'PUT' : 'POST';
-        
-        try {
-            const response = await adminFetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (response.ok) {
-                closePostModal();
-                window.location.reload();
-            } else {
-                const data = await response.json();
-                alert('保存失败: ' + (data.detail || '未知错误'));
-            }
-        } catch (err) {
-            if (err.message !== 'AUTH_EXPIRED') alert('网络异常，请稍后重试');
-        } finally {
-            postForm.dataset.submitting = 'false';
-            setFormSubmitting(postForm, false);
-        }
-    });
-
-    // Populate post modal for edit
-    function editPost(postObj) {
-        openPostModal();
-        document.getElementById('post-modal-title').textContent = '编辑技术博文';
-        postIdInput.value = postObj.id;
-        postTitle.value = postObj.title;
-        postSlug.value = postObj.slug;
-        postSummary.value = postObj.summary || '';
-        postCategory.value = postObj.category || 'Tech';
-        postTags.value = postObj.tags || '';
-        postPublished.checked = postObj.is_published;
-        postContent.value = postObj.content;
-        updateEditorPreview();
-    }
-
-    // Delete post helper
     async function deletePost(postId) {
         if (!confirm('你确定要删除这篇博客吗？删除后将无法恢复。')) return;
         try {
             const response = await adminFetch(`/api/posts/${postId}`, { method: 'DELETE' });
             if (response.ok) {
-                document.getElementById(`post-row-${postId}`).remove();
+                document.getElementById(`post-row-${postId}`)?.remove();
             } else {
                 alert('删除失败');
             }
-        } catch (err) {
-            if (err.message !== 'AUTH_EXPIRED') alert('网络异常');
+        } catch (error) {
+            if (error.message !== 'AUTH_EXPIRED') alert('网络异常');
         }
     }
 

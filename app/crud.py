@@ -24,6 +24,15 @@ def get_post(db: Session, post_id: int):
     return db.query(models.Post).filter(models.Post.id == post_id).first()
 
 
+def post_exists(db: Session, post_id: int) -> bool:
+    return (
+        db.query(models.Post.id)
+        .filter(models.Post.id == post_id)
+        .first()
+        is not None
+    )
+
+
 def get_post_by_slug(db: Session, slug: str):
     return db.query(models.Post).filter(models.Post.slug == slug).first()
 
@@ -33,6 +42,72 @@ def get_posts(db: Session, skip: int = 0, limit: int = 100, published_only: bool
     if published_only:
         query = query.filter(models.Post.is_published.is_(True))
     return query.order_by(models.Post.created_at.desc(), models.Post.id.desc()).offset(skip).limit(limit).all()
+
+
+def get_post_admin_summaries(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[dict]:
+    """返回后台列表所需的轻量文章元数据。
+
+    正文可能达到数 MB，列表页不应读取或序列化 content；
+    编辑时由单篇文章 API 按需加载完整数据。
+    """
+    rows = (
+        db.query(
+            models.Post.id,
+            models.Post.title,
+            models.Post.slug,
+            models.Post.category,
+            models.Post.is_published,
+            models.Post.views,
+            models.Post.created_at,
+            models.Post.updated_at,
+        )
+        .order_by(models.Post.created_at.desc(), models.Post.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": row.id,
+            "title": row.title,
+            "slug": row.slug,
+            "category": row.category,
+            "is_published": row.is_published,
+            "views": row.views,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+        for row in rows
+    ]
+
+
+def get_post_editor_options(db: Session) -> tuple[list[str], list[str]]:
+    """收集已有文章的分类与标签，用于编辑器快速选择。"""
+    values = db.query(models.Post.category, models.Post.tags).all()
+    categories: dict[str, str] = {}
+    tags: dict[str, str] = {}
+
+    for category, raw_tags in values:
+        normalized_category = (category or "").strip()
+        if normalized_category:
+            categories.setdefault(
+                normalized_category.casefold(),
+                normalized_category,
+            )
+
+        for raw_tag in (raw_tags or "").split(","):
+            tag = raw_tag.strip()
+            if tag:
+                tags.setdefault(tag.casefold(), tag)
+
+    return (
+        sorted(categories.values(), key=str.casefold),
+        sorted(tags.values(), key=str.casefold),
+    )
 
 
 def count_posts(db: Session, published_only: bool = True) -> int:

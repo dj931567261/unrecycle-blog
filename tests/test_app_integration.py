@@ -176,6 +176,108 @@ def test_anonymous_admin_redirect_and_write_api_rejection(app_bundle):
     assert api_response.json()["detail"] == "Not authenticated"
 
 
+def test_post_editor_is_protected_and_loads_full_content_on_demand(app_bundle):
+    with app_bundle.database.SessionLocal() as db:
+        post = app_bundle.models.Post(
+            title="独立编辑器测试文章",
+            slug="post-editor-integration",
+            content="post-editor-content-must-not-be-in-admin-list",
+            summary="编辑器集成测试",
+            category="编辑器测试",
+            tags="editor,autosave",
+            is_published=True,
+        )
+        db.add(post)
+        db.commit()
+        db.refresh(post)
+        post_id = post.id
+
+    anonymous_new = app_bundle.client.get(
+        "/admin/posts/new",
+        follow_redirects=False,
+    )
+    anonymous_edit = app_bundle.client.get(
+        f"/admin/posts/{post_id}/edit",
+        follow_redirects=False,
+    )
+    anonymous_api = app_bundle.client.get(f"/api/posts/{post_id}")
+    anonymous_detail = app_bundle.client.get("/blog/post-editor-integration")
+
+    assert anonymous_new.status_code == 303
+    assert anonymous_new.headers["location"] == "/login?next=/admin/posts/new"
+    assert anonymous_edit.status_code == 303
+    assert anonymous_edit.headers["location"] == (
+        f"/login?next=/admin/posts/{post_id}/edit"
+    )
+    assert anonymous_api.status_code == 401
+    assert f'/admin/posts/{post_id}/edit' not in anonymous_detail.text
+
+    _login(app_bundle)
+
+    new_editor = app_bundle.client.get("/admin/posts/new")
+    edit_editor = app_bundle.client.get(f"/admin/posts/{post_id}/edit")
+    post_api = app_bundle.client.get(f"/api/posts/{post_id}")
+    admin_page = app_bundle.client.get("/admin")
+    admin_detail = app_bundle.client.get("/blog/post-editor-integration")
+
+    assert new_editor.status_code == 200
+    assert edit_editor.status_code == 200
+    assert "/static/css/post-editor.css" in new_editor.text
+    assert "/static/js/admin-post-editor.js" in new_editor.text
+    assert 'data-markdown-action="heading-2"' in new_editor.text
+    assert 'data-markdown-action="heading-3"' in new_editor.text
+    assert 'data-markdown-action="heading-4"' in new_editor.text
+    assert "post-editor-content-must-not-be-in-admin-list" not in edit_editor.text
+
+    assert post_api.status_code == 200
+    assert post_api.headers["cache-control"] == "no-store"
+    assert post_api.json()["content"] == "post-editor-content-must-not-be-in-admin-list"
+    assert post_api.json()["is_published"] is True
+
+    assert admin_page.status_code == 200
+    assert "post-editor-content-must-not-be-in-admin-list" not in admin_page.text
+    assert f'href="/admin/posts/{post_id}/edit"' in admin_page.text
+    assert f'href="/admin/posts/{post_id}/edit"' in admin_detail.text
+
+
+def test_post_updates_use_etag_to_prevent_silent_overwrite(app_bundle):
+    _login(app_bundle)
+
+    created = app_bundle.client.post(
+        "/api/posts",
+        json=_post_payload(slug="etag-editor-post", is_published=False),
+    )
+    assert created.status_code == 201
+    post_id = created.json()["id"]
+    original_etag = created.headers["etag"]
+    assert original_etag.startswith('"') and original_etag.endswith('"')
+
+    loaded = app_bundle.client.get(f"/api/posts/{post_id}")
+    assert loaded.status_code == 200
+    assert loaded.headers["etag"] == original_etag
+
+    first_update = app_bundle.client.put(
+        f"/api/posts/{post_id}",
+        headers={"If-Match": original_etag},
+        json={"title": "第一个编辑窗口保存的标题"},
+    )
+    assert first_update.status_code == 200
+    updated_etag = first_update.headers["etag"]
+    assert updated_etag != original_etag
+
+    stale_update = app_bundle.client.put(
+        f"/api/posts/{post_id}",
+        headers={"If-Match": original_etag},
+        json={"title": "过期编辑窗口不应覆盖"},
+    )
+    assert stale_update.status_code == 409
+    assert stale_update.headers["etag"] == updated_etag
+    assert "another session" in stale_update.json()["detail"].lower()
+
+    latest = app_bundle.client.get(f"/api/posts/{post_id}")
+    assert latest.json()["title"] == "第一个编辑窗口保存的标题"
+
+
 def test_login_sets_hardened_cookie_without_returning_token(app_bundle):
     response = _login(app_bundle)
     payload = response.json()

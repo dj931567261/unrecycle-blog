@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '新建文章' if is_new else '编辑文章' }} | Unrecycle-Me{% endblock %}
+{% block description %}沉浸式 Markdown 文章编辑器{% endblock %}
+{% block body_class %}post-editor-body{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/post-editor.css?v=1.1">
+{% endblock %}
+
+{% block content %}
+<section id="post-editor-app" class="post-editor-shell" aria-label="文章编辑器" aria-busy="true">
+    <form id="post-editor-form" novalidate>
+        <header class="post-editor-header">
+            <div class="post-editor-header-inner">
+                <div class="post-editor-header-start">
+                    <a class="post-editor-back" href="/admin" aria-label="返回管理后台">
+                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                        <span>返回后台</span>
+                    </a>
+
+                    <div class="post-editor-document-meta">
+                        <span id="editor-document-label">{{ 'NEW / DRAFT' if is_new else 'EDIT / LOADING' }}</span>
+                        <span id="editor-save-status" class="post-editor-save-state" data-state="idle"
+                              role="status" aria-live="polite">
+                            <span aria-hidden="true"></span>
+                            <strong>准备就绪</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="post-editor-mode-switch" role="group" aria-label="编辑器视图">
+                    <button type="button" class="is-active" data-editor-mode="write" aria-pressed="true">
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i> 写作
+                    </button>
+                    <button type="button" data-editor-mode="split" aria-pressed="false">
+                        <i class="fa-solid fa-columns" aria-hidden="true"></i> 分栏
+                    </button>
+                    <button type="button" data-editor-mode="preview" aria-pressed="false">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i> 预览
+                    </button>
+                </div>
+
+                <div class="post-editor-actions">
+                    <a id="editor-view-link" class="btn btn-secondary" href="#" target="_blank"
+                       rel="noopener noreferrer" hidden>
+                        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                        查看文章
+                    </a>
+                    <button id="editor-settings-toggle" class="btn btn-secondary post-editor-settings-trigger"
+                            type="button" aria-controls="editor-settings-drawer" aria-expanded="false">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                        设置
+                    </button>
+                    <button class="btn btn-secondary post-editor-save-draft" type="button">
+                        <i class="fa-regular fa-floppy-disk" aria-hidden="true"></i>
+                        <span>保存草稿</span>
+                    </button>
+                    <button class="btn btn-primary post-editor-publish" type="button">
+                        <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                        <span>发布文章</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="editor-restore-banner" class="post-editor-restore-banner" role="status" hidden>
+            <div>
+                <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                <span id="editor-restore-message">检测到尚未同步到服务器的本地草稿。</span>
+            </div>
+            <div class="post-editor-restore-actions">
+                <button id="editor-restore-draft" type="button" class="btn btn-primary">恢复草稿</button>
+                <button id="editor-discard-draft" type="button" class="btn btn-secondary">忽略并删除</button>
+            </div>
+        </div>
+
+        <div id="editor-form-error" class="post-editor-form-error" data-error-for="form"
+             role="alert" tabindex="-1" hidden></div>
+
+        <div class="post-editor-main">
+            <div class="post-editor-title-wrap">
+                <label class="sr-only" for="post-title">文章标题</label>
+                <textarea id="post-title" class="post-editor-title-input" name="title" rows="1"
+                          maxlength="200" required autocomplete="off"
+                          placeholder="输入一个让人想读下去的标题…"></textarea>
+                <p class="post-editor-field-error" data-error-for="title" hidden></p>
+            </div>
+
+            <div class="post-editor-toolbar" role="toolbar" aria-label="Markdown 格式工具栏">
+                <button class="post-editor-tool" type="button" data-markdown-action="heading-2"
+                        title="章节标题（H2）" aria-label="插入二级标题">
+                    <i class="fa-solid fa-heading" aria-hidden="true"></i><span>H2</span>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="heading-3"
+                        title="小节标题（H3）" aria-label="插入三级标题">
+                    <span aria-hidden="true">H3</span>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="heading-4"
+                        title="子级标题（H4）" aria-label="插入四级标题">
+                    <span aria-hidden="true">H4</span>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="bold"
+                        title="加粗（Cmd/Ctrl+B）" aria-label="加粗选中文字">
+                    <i class="fa-solid fa-bold" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="italic"
+                        title="斜体" aria-label="将选中文字设为斜体">
+                    <i class="fa-solid fa-italic" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="link"
+                        title="链接（Cmd/Ctrl+K）" aria-label="插入链接">
+                    <i class="fa-solid fa-link" aria-hidden="true"></i>
+                </button>
+
+                <span class="post-editor-tool-separator" aria-hidden="true"></span>
+
+                <button class="post-editor-tool" type="button" data-markdown-action="quote"
+                        title="引用" aria-label="插入引用">
+                    <i class="fa-solid fa-quote-left" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="unordered-list"
+                        title="无序列表" aria-label="插入无序列表">
+                    <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="ordered-list"
+                        title="有序列表" aria-label="插入有序列表">
+                    <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="inline-code"
+                        title="行内代码" aria-label="插入行内代码">
+                    <i class="fa-solid fa-code" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="code-block"
+                        title="代码块" aria-label="插入代码块">
+                    <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                </button>
+
+                <span class="post-editor-tool-separator" aria-hidden="true"></span>
+
+                <button class="post-editor-tool" type="button" data-markdown-action="image"
+                        title="上传图片" aria-label="选择并上传图片">
+                    <i class="fa-regular fa-image" aria-hidden="true"></i>
+                </button>
+                <button class="post-editor-tool" type="button" data-markdown-action="separator"
+                        title="分隔线" aria-label="插入分隔线">
+                    <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                </button>
+                <input id="editor-image-input" type="file" multiple hidden
+                       accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp">
+
+                <span id="editor-upload-status" class="post-editor-upload-status" data-state="idle"
+                      role="status" aria-live="polite">可粘贴、拖拽或选择图片</span>
+            </div>
+
+            <div class="post-editor-mobile-tabs" role="tablist" aria-label="移动端编辑视图">
+                <button type="button" role="tab" class="is-active" data-mobile-panel="write"
+                        aria-selected="true">写作</button>
+                <button type="button" role="tab" data-mobile-panel="preview"
+                        aria-selected="false">预览</button>
+                <button type="button" role="tab" data-mobile-panel="settings"
+                        aria-selected="false" aria-expanded="false"
+                        aria-controls="editor-settings-drawer">设置</button>
+            </div>
+
+            <div id="post-editor-workspace" class="post-editor-workspace" data-mode="write">
+                <section class="post-editor-pane post-editor-write-pane" aria-label="Markdown 写作区">
+                    <div class="post-editor-pane-header">
+                        <span>MARKDOWN</span>
+                        <span>支持拖拽或粘贴图片</span>
+                    </div>
+                    <label class="sr-only" for="post-content">文章正文</label>
+                    <textarea id="post-content" class="post-editor-textarea" name="content"
+                              maxlength="2000000" required spellcheck="true"
+                              placeholder="从这里开始写作。支持标准 Markdown 语法…"></textarea>
+                    <p class="post-editor-field-error" data-error-for="content" hidden></p>
+                </section>
+
+                <section class="post-editor-pane post-editor-preview-pane" aria-label="文章预览区">
+                    <div class="post-editor-pane-header">
+                        <span>PREVIEW</span>
+                        <span>安全实时预览</span>
+                    </div>
+                    <article id="post-preview" class="post-editor-preview markdown-body">
+                        <p class="post-editor-preview-empty">正文预览会显示在这里。</p>
+                    </article>
+                </section>
+            </div>
+
+            <footer class="post-editor-stats">
+                <span id="editor-word-count">0 字 · 约 0 分钟阅读</span>
+                <span id="editor-local-status">本地草稿将在停止输入后自动保存</span>
+            </footer>
+        </div>
+
+        <button id="editor-settings-backdrop" class="post-editor-drawer-backdrop" type="button"
+                aria-label="关闭文章设置" tabindex="-1"></button>
+
+        <aside id="editor-settings-drawer" class="post-editor-settings-drawer"
+               role="dialog" aria-modal="true" aria-labelledby="editor-settings-title"
+               aria-describedby="editor-publication-hint" aria-hidden="true" inert>
+            <div class="post-editor-settings-header">
+                <div>
+                    <span class="page-kicker">POST SETTINGS</span>
+                    <h2 id="editor-settings-title">文章设置</h2>
+                </div>
+                <button id="editor-settings-close" class="modal-close" type="button"
+                        aria-label="关闭文章设置">&times;</button>
+            </div>
+
+            <div class="post-editor-settings-grid">
+                <div class="post-editor-field">
+                    <div class="post-editor-field-heading">
+                        <label for="post-slug">URL 别名</label>
+                        <span>必填</span>
+                    </div>
+                    <input id="post-slug" name="slug" class="form-control" type="text"
+                           maxlength="200" required autocomplete="off" placeholder="my-first-post">
+                    <small>用于文章地址，只能包含文字、数字、下划线和连字符。</small>
+                    <p class="post-editor-field-error" data-error-for="slug" hidden></p>
+                </div>
+
+                <div class="post-editor-field">
+                    <div class="post-editor-field-heading">
+                        <label for="post-summary">文章摘要</label>
+                        <button id="editor-generate-summary" type="button">从正文生成</button>
+                    </div>
+                    <textarea id="post-summary" name="summary" class="form-control" rows="5"
+                              maxlength="2000" placeholder="简要说明文章内容，可留空。"></textarea>
+                    <p class="post-editor-field-error" data-error-for="summary" hidden></p>
+                </div>
+
+                <div class="post-editor-field">
+                    <label for="post-category">文章分类</label>
+                    <input id="post-category" name="category" class="form-control" type="text"
+                           list="post-category-options" maxlength="80" autocomplete="off"
+                           placeholder="Tech" value="Tech">
+                    <datalist id="post-category-options">
+                        {% for category in post_categories %}
+                            <option value="{{ category }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    {% if post_categories %}
+                    <div class="post-editor-suggestions" aria-label="已有分类">
+                        {% for category in post_categories %}
+                            <button type="button" data-category-suggestion="{{ category }}">{{ category }}</button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <p class="post-editor-field-error" data-error-for="category" hidden></p>
+                </div>
+
+                <div class="post-editor-field">
+                    <label for="post-tags">文章标签</label>
+                    <input id="post-tags" name="tags" class="form-control" type="text"
+                           maxlength="500" autocomplete="off" placeholder="Python, FastAPI, SQLite">
+                    <small>多个标签使用英文逗号分隔。</small>
+                    {% if post_tags %}
+                    <div class="post-editor-suggestions" aria-label="已有标签">
+                        {% for tag in post_tags %}
+                            <button type="button" data-tag-suggestion="{{ tag }}">{{ tag }}</button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <p class="post-editor-field-error" data-error-for="tags" hidden></p>
+                </div>
+
+                <div class="post-editor-publication-card">
+                    <span>当前状态</span>
+                    <strong id="editor-publication-status" data-published="false">
+                        <i class="fa-solid fa-circle-pause" aria-hidden="true"></i>
+                        草稿
+                    </strong>
+                    <p id="editor-publication-hint">“保存草稿”不会公开文章；“发布文章”会立即更新线上内容。</p>
+                </div>
+            </div>
+        </aside>
+
+        <div class="post-editor-mobile-actions" aria-label="保存与发布">
+            <button class="btn btn-secondary post-editor-save-draft" type="button">
+                <i class="fa-regular fa-floppy-disk" aria-hidden="true"></i>
+                <span>保存草稿</span>
+            </button>
+            <button class="btn btn-primary post-editor-publish" type="button">
+                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                <span>发布文章</span>
+            </button>
+        </div>
+    </form>
+</section>
+
+<script id="post-editor-config" type="application/json">{{ {
+    "is_new": is_new,
+    "post_id": post_id,
+    "categories": post_categories,
+    "tags": post_tags
+}|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/marked.min.js"></script>
+<script src="/static/js/admin-post-editor.js?v=1.2"></script>
+{% endblock %}
