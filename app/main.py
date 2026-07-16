@@ -1151,7 +1151,7 @@ async def api_logout(request: Request):
     return response
 
 
-_POST_ETAG_FIELDS = (
+_POST_REVISION_FIELDS = (
     "title",
     "slug",
     "content",
@@ -1160,26 +1160,57 @@ _POST_ETAG_FIELDS = (
     "tags",
     "is_published",
 )
+_POST_REVISION_HEADER = "X-Post-Revision"
 _POST_CONFLICT_DETAIL = (
     "Post was modified in another session. Reload the latest version before saving."
 )
 
 
-def _post_etag(post) -> str:
-    """基于全部可编辑字段生成稳定的强 ETag。"""
+def _post_revision(post) -> str:
+    """基于全部可编辑字段生成不受代理压缩影响的应用版本号。"""
     canonical = json.dumps(
-        {field: getattr(post, field) for field in _POST_ETAG_FIELDS},
+        {field: getattr(post, field) for field in _POST_REVISION_FIELDS},
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    return f'"{hashlib.sha256(canonical).hexdigest()}"'
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _post_version_headers(post) -> dict[str, str]:
+    revision = _post_revision(post)
+    return {
+        "ETag": f'"{revision}"',
+        _POST_REVISION_HEADER: revision,
+    }
+
+
+def _normalize_etag_candidate(candidate: str) -> str:
+    """兼容 Nginx gzip 将源站强 ETag 自动弱化为 W/ 的情况。"""
+    normalized = candidate.strip()
+    if normalized[:2].upper() == "W/":
+        normalized = normalized[2:].lstrip()
+    return normalized
 
 
 def _if_match_satisfied(if_match: str, current_etag: str) -> bool:
-    """If-Match 使用强比较，同时兼容 RFC 定义的 * 与多标签列表。"""
-    candidates = {candidate.strip() for candidate in if_match.split(",")}
+    """校验 If-Match，并兼容代理对应用内容哈希添加的弱标签前缀。"""
+    candidates = {
+        _normalize_etag_candidate(candidate)
+        for candidate in if_match.split(",")
+    }
     return "*" in candidates or current_etag in candidates
+
+
+def _post_revision_matches_request(request: Request, current_revision: str) -> bool:
+    provided_revision = request.headers.get(_POST_REVISION_HEADER)
+    if provided_revision is not None:
+        return provided_revision.strip() == current_revision
+
+    if_match = request.headers.get("if-match")
+    if if_match is None:
+        return True
+    return _if_match_satisfied(if_match, f'"{current_revision}"')
 
 
 @app.post("/api/posts", response_model=schemas.PostInDB, status_code=status.HTTP_201_CREATED)
@@ -1192,7 +1223,7 @@ def create_post(
     if crud.get_post_by_slug(db, post.slug):
         raise HTTPException(status_code=409, detail="Slug already exists")
     created = crud.create_post(db, post)
-    response.headers["ETag"] = _post_etag(created)
+    response.headers.update(_post_version_headers(created))
     return created
 
 
@@ -1206,7 +1237,7 @@ def api_get_post(
     post = crud.get_post(db, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    response.headers["ETag"] = _post_etag(post)
+    response.headers.update(_post_version_headers(post))
     return post
 
 
@@ -1233,13 +1264,15 @@ def update_post(
     if not current:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    current_etag = _post_etag(current)
-    if_match = request.headers.get("if-match")
-    if if_match is not None and not _if_match_satisfied(if_match, current_etag):
+    current_revision = _post_revision(current)
+    if not _post_revision_matches_request(request, current_revision):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=_POST_CONFLICT_DETAIL,
-            headers={"ETag": current_etag},
+            headers={
+                "ETag": f'"{current_revision}"',
+                _POST_REVISION_HEADER: current_revision,
+            },
         )
 
     if post_update.slug:
@@ -1249,7 +1282,7 @@ def update_post(
     updated = crud.update_post(db, post_id, post_update)
     if not updated:
         raise HTTPException(status_code=404, detail="Post not found")
-    response.headers["ETag"] = _post_etag(updated)
+    response.headers.update(_post_version_headers(updated))
     return updated
 
 

@@ -100,7 +100,7 @@
         pendingUploads: 0,
         uploadFailureCount: 0,
         uploadWaveTotal: 0,
-        etag: null,
+        revision: null,
         slugManuallyEdited: false,
         lastServerSnapshot: '',
         lastSavedSlug: '',
@@ -198,6 +198,15 @@
 
     function serializeFields(fields = captureFields()) {
         return JSON.stringify(fields);
+    }
+
+    function readPostRevision(response) {
+        const revision = String(response.headers.get('X-Post-Revision') || '').trim();
+        if (/^[a-f0-9]{64}$/i.test(revision)) return revision.toLocaleLowerCase('en-US');
+
+        const etag = String(response.headers.get('ETag') || '').trim();
+        const match = etag.match(/^(?:W\/)?"([a-f0-9]{64})"$/i);
+        return match ? match[1].toLocaleLowerCase('en-US') : null;
     }
 
     function updateDirtyState() {
@@ -926,7 +935,11 @@
             elements.slug.focus();
             return 'slug-conflict';
         }
-        if (response.status === 409 || response.status === 412) {
+        const isVersionConflict = (response.status === 409 || response.status === 412) && (
+            Boolean(response.headers.get('X-Post-Revision')) ||
+            /modified in another session|reload the latest version/i.test(detail)
+        );
+        if (isVersionConflict) {
             state.hasConflict = true;
             state.isDirty = true;
             setFormError(
@@ -964,7 +977,10 @@
 
         try {
             const headers = { 'Content-Type': 'application/json' };
-            if (state.postId && state.etag) headers['If-Match'] = state.etag;
+            if (state.postId && state.revision) {
+                headers['X-Post-Revision'] = state.revision;
+                headers['If-Match'] = `"${state.revision}"`;
+            }
             const response = await authenticatedFetch(
                 state.postId ? `/api/posts/${state.postId}` : '/api/posts',
                 {
@@ -983,7 +999,7 @@
                 return;
             }
 
-            state.etag = response.headers.get('ETag');
+            state.revision = readPostRevision(response);
             const savedPost = await response.json();
             state.postId = savedPost.id;
             state.isNew = false;
@@ -1174,7 +1190,7 @@
                 }
                 throw new Error(detail);
             }
-            state.etag = response.headers.get('ETag');
+            state.revision = readPostRevision(response);
             const post = await response.json();
             applyFields(post);
             state.isPublished = Boolean(post.is_published);

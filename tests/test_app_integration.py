@@ -224,7 +224,7 @@ def test_post_editor_is_protected_and_loads_full_content_on_demand(app_bundle):
     assert new_editor.status_code == 200
     assert edit_editor.status_code == 200
     assert "/static/css/post-editor.css" in new_editor.text
-    assert "/static/js/admin-post-editor.js" in new_editor.text
+    assert "/static/js/admin-post-editor.js?v=1.4" in new_editor.text
     assert 'data-markdown-action="heading-2"' in new_editor.text
     assert 'data-markdown-action="heading-3"' in new_editor.text
     assert 'data-markdown-action="heading-4"' in new_editor.text
@@ -251,11 +251,15 @@ def test_post_updates_use_etag_to_prevent_silent_overwrite(app_bundle):
     assert created.status_code == 201
     post_id = created.json()["id"]
     original_etag = created.headers["etag"]
+    original_revision = created.headers["x-post-revision"]
     assert original_etag.startswith('"') and original_etag.endswith('"')
+    assert original_etag == f'"{original_revision}"'
+    assert len(original_revision) == 64
 
     loaded = app_bundle.client.get(f"/api/posts/{post_id}")
     assert loaded.status_code == 200
     assert loaded.headers["etag"] == original_etag
+    assert loaded.headers["x-post-revision"] == original_revision
 
     first_update = app_bundle.client.put(
         f"/api/posts/{post_id}",
@@ -264,19 +268,51 @@ def test_post_updates_use_etag_to_prevent_silent_overwrite(app_bundle):
     )
     assert first_update.status_code == 200
     updated_etag = first_update.headers["etag"]
+    updated_revision = first_update.headers["x-post-revision"]
     assert updated_etag != original_etag
+    assert updated_etag == f'"{updated_revision}"'
+
+    weak_proxy_update = app_bundle.client.put(
+        f"/api/posts/{post_id}",
+        headers={"If-Match": f"W/{updated_etag}"},
+        json={"title": "代理弱化 ETag 后仍可保存"},
+    )
+    assert weak_proxy_update.status_code == 200
+    proxy_revision = weak_proxy_update.headers["x-post-revision"]
+    assert proxy_revision != updated_revision
+
+    revision_header_update = app_bundle.client.put(
+        f"/api/posts/{post_id}",
+        headers={"X-Post-Revision": proxy_revision},
+        json={"title": "应用版本头保存成功"},
+    )
+    assert revision_header_update.status_code == 200
+    latest_revision = revision_header_update.headers["x-post-revision"]
+    assert latest_revision != proxy_revision
+
+    stale_legacy_update = app_bundle.client.put(
+        f"/api/posts/{post_id}",
+        headers={"If-Match": f"W/{updated_etag}"},
+        json={"title": "过期弱 ETag 不应覆盖"},
+    )
+    assert stale_legacy_update.status_code == 409
+    assert stale_legacy_update.headers["x-post-revision"] == latest_revision
 
     stale_update = app_bundle.client.put(
         f"/api/posts/{post_id}",
-        headers={"If-Match": original_etag},
+        headers={
+            "X-Post-Revision": original_revision,
+            "If-Match": f'"{latest_revision}"',
+        },
         json={"title": "过期编辑窗口不应覆盖"},
     )
     assert stale_update.status_code == 409
-    assert stale_update.headers["etag"] == updated_etag
+    assert stale_update.headers["etag"] == f'"{latest_revision}"'
+    assert stale_update.headers["x-post-revision"] == latest_revision
     assert "another session" in stale_update.json()["detail"].lower()
 
     latest = app_bundle.client.get(f"/api/posts/{post_id}")
-    assert latest.json()["title"] == "第一个编辑窗口保存的标题"
+    assert latest.json()["title"] == "应用版本头保存成功"
 
 
 def test_login_sets_hardened_cookie_without_returning_token(app_bundle):
